@@ -1,0 +1,33 @@
+{
+	"name": "native-ext",
+	"version": "0.0.1",
+	"description": "WebExtensions native connector",
+	"author": "Niklas Gollenstede",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git@github.com:NiklasGollenstede/native-ext.git"
+	},
+	"dependencies": {
+		"console-stamp": "0.2.5",
+		"dialog": "0.3.0",
+		"fs-extra": "3.0.1",
+		"json5": "0.5.0",
+		"multiport": "0.1.0"
+	},
+	"devDependencies": {
+		"nexe": "1.1.2",
+		"babel-eslint": "7.1.1",
+		"eslint": "3.14.1",
+		"eslintrc": "NiklasGollenstede/eslintrc"
+	},
+	"main": "build.js",
+	"scripts": {
+		"test": "mocha test/selenium --recursive",
+		"build": "nexe -i ./index.js -o ./native-ext.exe -f",
+		"lint": "eslint --ignore-path .gitignore ."
+	},
+	"eslintConfig": {
+		"extends": "./node_modules/eslintrc/node.js"
+	}
+}

@@ -1,0 +1,7 @@
+node_modules
+/tmp/
+/log.txt
+/npm-debug.log
+/npm-debug.log.*
+/package-lock.json
+/*.exe

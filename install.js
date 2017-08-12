@@ -6,10 +6,9 @@ const child_process = require('child_process');
 const execute = (bin, ...args) => new Promise((resolve, reject) => child_process.execFile(bin, args, (error, stdout, stderr) =>
 	error ? reject(Object.assign(error, { stderr, stdout, })) : resolve(stdout)
 ));
-// let packageJson; try { packageJson = require(Path.resolve(__dirname, '../package.json')); } catch (_) { packageJson = require(Path.resolve(__dirname, './package.json')); }
-const packageJson = { "version": "0.0.1", "description": "WebExtensions native connector", };
-const name = 'native_ext_v'+ packageJson.version;
-const node = process.argv[1] !== 'nexe.js';
+
+const name = 'de.niklasg.native_ext'; // 'native_ext_v0.0.1';
+const node = process.argv[1] === 'nexe.js' ? '' : 'node'; // 'node-dwe --pipe=ioe --';
 const os = process.platform;
 const windows = os === 'win32';
 const scriptExt = windows ? '.bat' : '.sh';
@@ -19,10 +18,10 @@ const outPath = path => Path.resolve(installDir, path);
 async function install({ source, }) {
 	try { source = require.resolve(source); } catch (_) { } node && (source = Path.resolve(source, '..'));
 	const binTarget = outPath('bin') + (windows && !node ? '.exe' : '');
-	const exec = (...args) => '@echo off\n\n'+ (node ? 'node '+ binTarget : binTarget) +' '+ args.map(JSON.stringify).join(' ');
+	const exec = (...args) => '@echo off\n\n'+ (node ? node +' '+ binTarget : binTarget) +' '+ args.map(JSON.stringify).join(' ');
 
 	const manifest = {
-		name, description: packageJson.description,
+		name, description: 'WebExtensions native connector',
 		path: 'connect'+ scriptExt,
 		type: 'stdio', // mandatory
 	};

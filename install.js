@@ -1,7 +1,19 @@
 'use strict';
 
-const FS = require('fs-extra');
+const promisify = require('util').promisify || (func => (...args) => new Promise((g, b) => func(...args, (e, v) => e ? b(e) : g(v))));
+
 const Path = require('path');
+const FS = require('fs');
+const link = promisify(FS.link);
+const unlink = promisify(FS.unlink);
+const symlink = promisify(FS.symlink);
+const readFile = promisify(FS.readFile);
+const writeFile = promisify(FS.writeFile);
+const mkdir = promisify(FS.mkdir);
+const readdir = promisify(FS.readdir);
+const rimraf = promisify(require('rimraf'));
+const replaceFile = (path, data, opt) => unlink(path).catch(_=>0).then(() => writeFile(path, data, opt));
+
 const child_process = require('child_process');
 const execute = (bin, ...args) => new Promise((resolve, reject) => child_process.execFile(bin, args, (error, stdout, stderr) =>
 	error ? reject(Object.assign(error, { stderr, stdout, })) : resolve(stdout)
@@ -12,77 +24,114 @@ const node = process.argv[1].startsWith(require('path').resolve('/snapshot/')) ?
 const os = process.platform;
 const windows = os === 'win32';
 const scriptExt = windows ? '.bat' : '.sh';
-const installDir = windows ? process.env.APPDATA +'\\'+ name : '~/.'+ name;
+const installDir = windows ? process.env.APPDATA +'\\'+ name : require('os').homedir() +'/.'+ name;
 const outPath = path => Path.resolve(installDir, path);
 
 async function install({ source, }) {
 	try { source = require.resolve(source); } catch (_) { } node && (source = Path.resolve(source, '..'));
 	const binTarget = outPath('bin') + (windows && !node ? '.exe' : '');
-	const exec = (...args) => '@echo off\n\n'+ (node ? node +' '+ binTarget : binTarget) +' '+ args.map(JSON.stringify).join(' ');
+	const exec = (...args) => (windows ? '@echo off\r\n\r\n' : '#!/bin/bash\n\n')
+	+ (node ? node +' '+ binTarget : binTarget)
+	+' '+ args.map(_=>JSON.stringify(_)).join(' ');
 
 	const manifest = {
 		name, description: 'WebExtensions native connector',
-		path: 'connect'+ scriptExt,
+		path: (windows ? '' : installDir +'/') +'connect'+ scriptExt,
 		type: 'stdio', // mandatory
 	};
 
 	try {
-		(await FS.remove(binTarget));
-	} catch (error) {
+		(await unlink(binTarget));
+	} catch (error) { if (error.code !== 'ENOENT') {
 		throw error.code === 'EBUSY' ? new Error(`A file in the installation folder "${ outPath('') }" seems to be open. Please close all browsers and try again.`) : error;
-	}
+	} }
+
+	try { (await mkdir(installDir)); } catch (_) { }
 
 	(await Promise.all([
-		node ? FS.ensureSymlink(source, binTarget, 'junction') : FS.copy(source, binTarget),
-		FS.outputFile(outPath('chrome.json'),  JSON.stringify(manifest, null, '\t'), 'utf8'),
-		FS.outputFile(outPath('firefox.json'), JSON.stringify(manifest, null, '\t'), 'utf8'),
-		FS.mkdirs(outPath('vendors')),
+		node ? symlink(source, binTarget, 'junction') : copyFile(source, binTarget),
+		replaceFile(outPath('chrome.json'),  JSON.stringify(manifest, null, '\t'), 'utf8'),
+		replaceFile(outPath('firefox.json'), JSON.stringify(manifest, null, '\t'), 'utf8'),
+		mkdir(outPath('vendors')).catch(_=>0),
 		...(windows ? [
-			FS.outputFile(outPath('connect.bat'), exec('connect', '%*'), 'utf8'),
+			replaceFile(outPath('connect.bat'), exec('connect', '%*'), 'utf8'),
 			execute('REG', 'ADD', 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\'+ name, '/ve', '/t', 'REG_SZ', '/d', outPath('chrome.json'),  '/f'),
 			execute('REG', 'ADD', 'HKCU\\Software\\Mozilla\\NativeMessagingHosts\\'+        name, '/ve', '/t', 'REG_SZ', '/d', outPath('firefox.json'), '/f'),
-			FS.outputFile(outPath('uninstall.bat'), exec('uninstall', '%*'), 'utf8'),
-			FS.outputFile(outPath('refresh.bat'), exec('refresh', '%*'), 'utf8'),
+			replaceFile(outPath('uninstall.bat'), exec('uninstall', '%*'), 'utf8'),
+			replaceFile(outPath('refresh.bat'), exec('refresh', '%*'), 'utf8'),
 		] : [ ]),
-		// TODO: link on Linux / MAC
+		...(os === 'linux' ? [
+			replaceFile(outPath('connect.sh'), exec('connect', '$@'), { mode: '754', }),
+			replaceFile(outPath('uninstall.sh'), exec('uninstall', '$@'), { mode: '754', }),
+			replaceFile(outPath('refresh.sh'), exec('refresh', '$@'), { mode: '754', }),
+		] : [ ]),
 	]));
+
+	os === 'linux' && (await Promise.all([
+		...[ 'chromium', 'google-chrome', ]
+		.map(chr => mkdir(outPath(`../.config/`)).catch(_=>0)
+		.then(() => mkdir(outPath(`../.config/${chr}`)).catch(_=>0))
+		.then(() => mkdir(outPath(`../.config/${chr}/NativeMessagingHosts`)).catch(_=>0))
+		.then(() => unlink(outPath(`../.config/${chr}/NativeMessagingHosts/${ name }.json`)).catch(_=>0))
+		.then(() => symlink(outPath(`chrome.json`), outPath(`../.config/${chr}/NativeMessagingHosts/${ name }.json`)))),
+		/*firefox*/ mkdir(outPath(`../.mozilla/`)).catch(_=>0)
+		.then(() => mkdir(outPath(`../.mozilla/native-messaging-hosts`)).catch(_=>0))
+		.then(() => unlink(outPath(`../.mozilla/native-messaging-hosts/${ name }.json`)).catch(_=>0))
+		.then(() => symlink(outPath('firefox.json'), outPath(`../.mozilla/native-messaging-hosts/${ name }.json`))),
+	]));
+
+	// TODO: MAC
 
 	(await refresh(arguments[0]));
 }
 
 async function refresh() {
 	const urls = [ ], ids = [ ];
-	(await (await FS.readdir(outPath('vendors'))).map(name =>
-		FS.readJson(outPath('vendors/'+ name))
+	(await (await readdir(outPath('vendors'))).map(name =>
+		readFile(outPath('vendors/'+ name))
 		.then(config => {
+			config = JSON.parse(config);
 			config['chrome-ext-urls'] && urls.push(...config['chrome-ext-urls']);
 			config['firefox-ext-ids'] && ids.push(...config['firefox-ext-ids']);
 		}).catch(error => console.error(error))
 	));
 
 	(await Promise.all([
-		FS.outputFile(outPath('chrome.json'),  JSON.stringify(
-			Object.assign((await FS.readJson(outPath('chrome.json'))), { allowed_origins: urls, }),
+		replaceFile(outPath('chrome.json'),  JSON.stringify(
+			Object.assign(JSON.parse((await readFile(outPath('chrome.json')))), { allowed_origins: urls, }),
 		null, '\t'), 'utf8'),
-		FS.outputFile(outPath('firefox.json'),  JSON.stringify(
-			Object.assign((await FS.readJson(outPath('firefox.json'))), { allowed_extensions: ids, }),
+		replaceFile(outPath('firefox.json'),  JSON.stringify(
+			Object.assign(JSON.parse((await readFile(outPath('firefox.json')))), { allowed_extensions: ids, }),
 		null, '\t'), 'utf8'),
 	]));
 }
 
 async function uninstall() {
 	try {
-		(await FS.remove(outPath('')));
+		(await rimraf(installDir));
 	} catch (error) {
 		throw error.code === 'EBUSY' ? new Error(`A file in the installation folder "${ outPath('') }" seems to be open. Please close all browsers and try again.`) : error;
 	}
 	(await Promise.all([
 		...(windows ? [
-			execute('REG', 'ADD', 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\'+ name, '/f').catch(_=>_),
-			execute('REG', 'ADD', 'HKCU\\Software\\Mozilla\\NativeMessagingHosts\\'+        name, '/f').catch(_=>_),
+			execute('REG', 'ADD', 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\'+ name, '/f').catch(_=>0),
+			execute('REG', 'ADD', 'HKCU\\Software\\Mozilla\\NativeMessagingHosts\\'+        name, '/f').catch(_=>0),
 		] : [ ]),
-		// TODO: unlink on Linux / MAC
+		...(os === 'linux' ? [
+			...[ 'chromium', 'google-chrome', ]
+			.map(chr => unlink(outPath(`../.config/${chr}/NativeMessagingHosts/${ name }.json`)).catch(_=>0)),
+			/*firefox*/ unlink(outPath(`../.mozilla/native-messaging-hosts/${ name }.json`)).catch(_=>0),
+		] : [ ])
+
+		// TODO: unlink on MAC
 	]));
 }
 
 module.exports = { install, refresh, uninstall, };
+
+function copyFile(source, target) { return new Promise(function(resolve, reject) {
+	const read = fs.createReadStream(source), write = fs.createWriteStream(target);
+	read.on('error', failed); write.on('error', failed); write.on('finish', resolve);
+	function failed(error) { read.destroy(); write.end(); reject(error); }
+	read.pipe(write);
+}); }

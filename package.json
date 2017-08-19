@@ -9,7 +9,7 @@
 		"url": "git@github.com:NiklasGollenstede/native-ext.git"
 	},
 	"dependencies": {
-		"fs-extra": "3.0.1",
+		"rimraf": "2.6.1",
 		"multiport": "0.1.0"
 	},
 	"devDependencies": {

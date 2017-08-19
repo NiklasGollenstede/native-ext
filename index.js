@@ -1,4 +1,4 @@
-'use strict'; (async () => {
+'use strict'; module.exports = (async () => {
 
 Error.stackTraceLimit = Infinity; // get them all ...
 

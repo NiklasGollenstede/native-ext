@@ -1,6 +1,6 @@
 'use strict';
 
-const FS = require('fs-extra');
+const FS = require('fs');
 const Path = require('path');
 
 const { stdin, stdout, } = process;
@@ -19,11 +19,18 @@ const { stdin, stdout, } = process;
 		const stderr = FS.createWriteStream(logPath, /*{ flags: 'r+', }*/);
 		Object.defineProperty(process, 'stdout', { get() { return stdout; }, });
 		Object.defineProperty(process, 'stderr', { get() { return stderr; }, });
-		const console = new (require('console').Console)(stdout, stderr);
-		require('console-stamp')(console, {
-			pattern: 'yyyy-mm-dd HH:MM:ss.l',
-			label: true, stdout, stderr,
-		});
+		const timezone = new Date().getTimezoneOffset() * -60e3;
+		const timespamp = level => `[${ new Date(Date.now() + timezone).toISOString().replace('T', ' ').slice(0, -1) }] [${ level }]`;
+		const console = new class extends require('console').Console {
+			constructor() { super(...arguments); }
+			log    (...args) { return super.log    (timespamp('log'),    ...args); }
+			info   (...args) { return super.info   (timespamp('info'),   ...args); }
+			warn   (...args) { return super.warn   (timespamp('warn'),   ...args); }
+			error  (...args) { return super.error  (timespamp('error'),  ...args); }
+			dir    (...args) { return super.dir    (timespamp('dir'),    ...args); }
+			trace  (...args) { return super.trace  (timespamp('trace'),  ...args); }
+			assert (...args) { return super.assert (timespamp('assert'), ...args); }
+		}(stdout, stderr);
 		Object.defineProperty(global, 'console', { get() { return console; }, });
 		// TODO: could also log to 'setup' or a different 'channel'
 	}

@@ -26,8 +26,14 @@ async function install({ source, }) {
 		type: 'stdio', // mandatory
 	};
 
+	try {
+		(await FS.remove(binTarget));
+	} catch (error) {
+		throw error.code === 'EBUSY' ? new Error(`A file in the installation folder "${ outPath('') }" seems to be open. Please close all browsers and try again.`) : error;
+	}
+
 	(await Promise.all([
-		node ? FS.remove(binTarget).then(() => FS.ensureSymlink(source, binTarget, 'junction')) : FS.copy(source, binTarget),
+		node ? FS.ensureSymlink(source, binTarget, 'junction') : FS.copy(source, binTarget),
 		FS.outputFile(outPath('chrome.json'),  JSON.stringify(manifest, null, '\t'), 'utf8'),
 		FS.outputFile(outPath('firefox.json'), JSON.stringify(manifest, null, '\t'), 'utf8'),
 		FS.mkdirs(outPath('vendors')),

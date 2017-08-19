@@ -9,10 +9,7 @@
 		"url": "git@github.com:NiklasGollenstede/native-ext.git"
 	},
 	"dependencies": {
-		"console-stamp": "0.2.5",
-		"dialog": "0.3.1",
 		"fs-extra": "3.0.1",
-		"json5": "0.5.0",
 		"multiport": "0.1.0"
 	},
 	"devDependencies": {
@@ -21,7 +18,7 @@
 		"eslint": "3.14.1",
 		"eslintrc": "NiklasGollenstede/eslintrc"
 	},
-	"main": "build.js",
+	"main": "index.js",
 	"scripts": {
 		"test": "mocha test/selenium --recursive",
 		"build": "nexe -i ./index.js -o ./native-ext.exe -f",

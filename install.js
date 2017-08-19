@@ -8,7 +8,7 @@ const execute = (bin, ...args) => new Promise((resolve, reject) => child_process
 ));
 
 const name = 'de.niklasg.native_ext'; // 'native_ext_v0.0.1';
-const node = process.argv[1] === 'nexe.js' ? '' : 'node'; // 'node-dwe --pipe=ioe --';
+const node = process.argv[1].startsWith(require('path').resolve('/snapshot/')) ? '' : 'node'; // 'node-dwe --pipe=ioe --';
 const os = process.platform;
 const windows = os === 'win32';
 const scriptExt = windows ? '.bat' : '.sh';

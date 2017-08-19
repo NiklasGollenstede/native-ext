@@ -5,12 +5,11 @@ Error.stackTraceLimit = Infinity; // get them all ...
 const args = process.argv.slice(2);
 
 switch (args[0]) {
-	case 'eval': { console.log(eval(args.slice(1).join(' '))); } break;
 	case undefined: // started from file system / without args ==> install
 	case 'install': case 'refresh': case 'uninstall': {
 		const command = args[0] || 'install';
 		(await require('./install.js')[command]({
-			source: process.argv[1] === 'nexe.js' ? process.argv[0] : __dirname,
+			source: process.argv[1].startsWith(require('path').resolve('/snapshot/')) ? process.argv[0] : __dirname,
 		}));
 		dialog('info', 'Native-Ext', `Operation ${ command } successful`);
 	} break;

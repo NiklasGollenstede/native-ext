@@ -63,8 +63,8 @@ const nativeModules = new Set([
 	'assert', 'async_hooks', 'buffer', 'child_process', 'cluster', 'console', 'crypto', 'dgram', 'dns',
 	'events', 'fs', 'http', 'http2', 'https', 'net', 'os', 'path', 'querystring', 'readline', 'repl',
 	'stream', 'string_decoder', 'tls', 'tty', 'url', 'utils', 'v8', 'vm', 'zlib',
-]);
+]), get = require;
 function requireNative(id) {
-	if (!nativeModules.has(id)) { throw new TypeError(`No such native module "${ id }"`); }
-	return require(id);
+	if (nativeModules.has(id)) { return get(id); }
+	throw new TypeError(`No such native module "${ id }"`);
 }

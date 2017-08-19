@@ -13,7 +13,7 @@
 		"multiport": "0.1.0"
 	},
 	"devDependencies": {
-		"nexe": "1.1.2",
+		"pkg": "4.2.3",
 		"babel-eslint": "7.1.1",
 		"eslint": "3.14.1",
 		"eslintrc": "NiklasGollenstede/eslintrc"
@@ -21,7 +21,8 @@
 	"main": "index.js",
 	"scripts": {
 		"test": "mocha test/selenium --recursive",
-		"build": "nexe -i ./index.js -o ./native-ext.exe -f",
+		"build": "pkg index.js -o release/native-ext -t node8.3",
+		"build-all": "pkg index.js -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64",
 		"lint": "eslint --ignore-path .gitignore ."
 	},
 	"eslintConfig": {

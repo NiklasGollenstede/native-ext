@@ -13,7 +13,8 @@ const { stdin, stdout, } = process;
 		Object.defineProperty(process, 'stdout', { get() { return stdout; }, });
 		Object.defineProperty(process, 'stderr', { get() { return stderr; }, });
 	} else {
-		const logPath = Path.resolve(__dirname, __dirname.endsWith('bin') ? '..' : '.', 'log.txt');
+		const cwd = process.cwd();
+		const logPath = Path.resolve(cwd, cwd.endsWith('bin') ? '..' : '.', 'log.txt');
 		const stdout = FS.createWriteStream(logPath, /*{ flags: 'r+', }*/);
 		const stderr = FS.createWriteStream(logPath, /*{ flags: 'r+', }*/);
 		Object.defineProperty(process, 'stdout', { get() { return stdout; }, });
@@ -49,11 +50,14 @@ setup.addHandler(async function init({ script, sourceURL, }) {
 	return id;
 });
 
-console.log('running');
+console.info('running');
 
-
-const nativeModules = [ 'fs', 'path', ]; // TODO: list all native modules
+const nativeModules = new Set([
+	'assert', 'async_hooks', 'buffer', 'child_process', 'cluster', 'console', 'crypto', 'dgram', 'dns',
+	'events', 'fs', 'http', 'http2', 'https', 'net', 'os', 'path', 'querystring', 'readline', 'repl',
+	'stream', 'string_decoder', 'tls', 'tty', 'url', 'utils', 'v8', 'vm', 'zlib',
+]);
 function requireNative(id) {
-	if (!nativeModules.includes(id)) { throw new TypeError(`No such native module "${ id }"`); }
+	if (!nativeModules.has(id)) { throw new TypeError(`No such native module "${ id }"`); }
 	return require(id);
 }

@@ -10,7 +10,7 @@
 	},
 	"dependencies": {
 		"console-stamp": "0.2.5",
-		"dialog": "0.3.0",
+		"dialog": "0.3.1",
 		"fs-extra": "3.0.1",
 		"json5": "0.5.0",
 		"multiport": "0.1.0"

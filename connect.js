@@ -44,7 +44,7 @@ const setup = new Port({ port: channel, channel: '-', }, Multiplex);
 // global.setup = setup; global.stdout = stdout; global.stdin = stdin;
 let lastId = 0;
 
-setup.addHandler(function echo(arg) { return arg; });
+setup.addHandler(function ping() { return 'pong'; });
 
 setup.addHandler(async function init({ script, sourceURL, }) {
 	const id = ++lastId +'';

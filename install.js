@@ -31,8 +31,7 @@ async function install({ source, }) {
 	try { source = require.resolve(source); } catch (_) { } node && (source = Path.resolve(source, '..'));
 	const binTarget = outPath('bin') + (windows && !node ? '.exe' : '');
 	const exec = (...args) => (windows ? '@echo off\r\n\r\n' : '#!/bin/bash\n\n')
-	+ (node ? node +' '+ `"${binTarget}"` : `"${binTarget}"`)
-	// + (node ? node +' '+ './bin/index.js' : windows ? '.\\bin.exe' : './bin') // relative paths would be better, but (like this) don't work when called from a parent dir
+	+ (node ? node +` "${binTarget}"` : `"${binTarget}"`) // use absolute paths. The install dir can't be moved anyway
 	+' '+ args.map(_=>JSON.stringify(_)).join(' ');
 
 	const manifest = {

@@ -8,7 +8,8 @@ This application enables browser extensions/add-ons to be truly awesome (again).
 
 ### Installation
 
-1. **Download**: Unless you know that you need a specific version, get the latest (topmost) version matching your operating system from the [releases page](https://github.com/NiklasGollenstede/native-ext/releases).
+1. **Download**: Unless you know that you need a specific version, get the latest (topmost) version matching your operating system from the [releases page](https://github.com/NiklasGollenstede/native-ext/releases).\
+Alternatively, you can [build NativeExt](#building) yourself.
 2. **Installation**: Just double-click (run/open) the downloaded file. It should not require elevated privileges of any kind. After a few seconds, you should see a success message.
 3. **Extension registration**: For the browsers to allow the communication between your extensions and NativeExt, the extensions need to be registered. If the extension in question provided you with an registration script, run that and you are done.\
 *Otherwise*:
@@ -117,7 +118,7 @@ Browsers only allow extensions to connect to native applications it the extensio
 NativeExt can automatically update its manifest, but the ids of the allowed extensions must be known. To register an extension, place a JSON file of the following format (but without the comments) in the `/vandors/` directory in NativeExts installation directory.
 ```json5
 {
-	// list of chrome extension URL-prefixes, starting with `chrome-extension://` and anding with a `/` after the id
+	// list of chrome extension URL-prefixes, starting with `chrome-extension://` and ending with a `/` after the id
 	"chrome-ext-urls": [
 		// these ids are only constant for extensions hosted in the chrome store
 		// otherwise, they are different for every (development mode) installation of the extension
@@ -132,3 +133,23 @@ NativeExt can automatically update its manifest, but the ids of the allowed exte
 
 ```
 The name of your file should be your extensions name/id/domain or that of its developing organization and should probably not contain spaces.
+
+### Building
+
+Building NativeExt requires node.js v8+ and npm. After cloning or downloading the sources, install the dependencies with:
+
+`npm install`
+
+Now you can either install directly from the sources (this creates symlinks, so keep the sources and node.js v8+):
+
+`node install`
+
+build only for your current system:
+
+`npm run build`
+
+or for all supported platforms:
+
+`npm run build-all`
+
+The builds will be placed in the `/release` folder.

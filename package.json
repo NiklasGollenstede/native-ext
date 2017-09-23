@@ -1,6 +1,6 @@
 {
 	"name": "native-ext",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "WebExtensions native connector",
 	"author": "Niklas Gollenstede",
 	"license": "MIT",
@@ -18,11 +18,11 @@
 		"eslint": "3.14.1",
 		"eslintrc": "NiklasGollenstede/eslintrc"
 	},
-	"main": "index.js",
+	"main": "start.js",
 	"scripts": {
 		"test": "mocha test/selenium --recursive",
-		"build": "pkg index.js -o release/native-ext -t node8.3",
-		"build-all": "pkg index.js -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64",
+		"build": "pkg start.js -o release/native-ext -t node8.3",
+		"build-all": "pkg start.js -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64",
 		"lint": "eslint --ignore-path .gitignore ."
 	},
 	"eslintConfig": {

@@ -38,8 +38,8 @@ const { stdin, stdout, } = process;
 }
 
 
-const Port = require('multiport'), { runtimePort, Multiplex, } = require('./port.js');
-const channel = new runtimePort(stdin, stdout);
+const Port = require('multiport'), Multiplex = require('./multiplex.js');
+const channel = new (require('./runtime-port.js'))(stdin, stdout);
 const setup = new Port({ port: channel, channel: '-', }, Multiplex);
 // global.setup = setup; global.stdout = stdout; global.stdin = stdin;
 let lastId = 0;

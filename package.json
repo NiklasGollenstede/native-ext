@@ -12,12 +12,14 @@
 		"web-ext-utils": "0.0.13"
 	},
 	"devDependencies": {
-		"multiport": "0.2.1",
-		"rimraf": "2.6.1",
-		"pkg": "4.2.3",
 		"babel-eslint": "7.1.1",
 		"eslint": "3.14.1",
-		"eslintrc": "NiklasGollenstede/eslintrc"
+		"eslintrc": "NiklasGollenstede/eslintrc",
+		"extract-zip": "1.6.5",
+		"multiport": "0.2.1",
+		"pkg": "4.2.3",
+		"rimraf": "2.6.1",
+		"tmp": "0.0.33"
 	},
 	"main": "start.js",
 	"scripts": {

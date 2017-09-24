@@ -54,4 +54,4 @@ module.exports = function runtimePort(stdin, stdout) {
 			removeListener: onDisconnect.delete.bind(onDisconnect),
 		},
 	};
-}
+};

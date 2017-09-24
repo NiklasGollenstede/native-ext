@@ -1,57 +1,58 @@
-'use strict';
+'use strict'; const ready = (async () => { (await null);
 
-const FS = global.FS = Object.assign({ }, require('fs')), Path = require('path');
+//	(await new Promise(done => setTimeout(done, 2000))); /*debugger;*/
 
 // set up communication
 const Port = require('multiport'), port = new Port(
 	new (require('./runtime-port.js'))(process.stdin, process.stdout),
 	Port.web_ext_Port,
 );
+{ const { stdin, } = process; stdin.pause();  ready.then(() => stdin.resume()); }
 
-{ // can't log to stdio if started by the browser ==> log to './log.txt'.
+const FS = global.FS = Object.assign({ }, require('fs')), Path = require('path');
+
+{ // can't log to stdio if started by the browser ==> forward to browser console
 	if (process.versions.electron) { // started in debug mode, console is fine, but need to redirect stdio to it
 		const { Writable, } = require('stream'), stream = name => new Writable({ write(chunk, encoding, callback) {
 			console.log(name, chunk); callback && Promise.resolve().then(callback); // eslint-disable-line
 		}, });
+
 		const stdout = stream('stdout'), stderr = stream('stderr');
 		Object.defineProperty(process, 'stdout', { get() { return stdout; }, });
 		Object.defineProperty(process, 'stderr', { get() { return stderr; }, });
 	} else {
-		const cwd = process.cwd();
-		const logPath = Path.resolve(cwd, cwd.endsWith('bin') ? '..' : '.', 'log.txt');
-		const stdout = FS.createWriteStream(logPath, /*{ flags: 'r+', }*/);
-		const stderr = FS.createWriteStream(logPath, /*{ flags: 'r+', }*/);
-		Object.defineProperty(process, 'stdout', { get() { return stdout; }, });
-		Object.defineProperty(process, 'stderr', { get() { return stderr; }, });
-		const timezone = new Date().getTimezoneOffset() * -60e3;
-		const timespamp = level => `[${ new Date(Date.now() + timezone).toISOString().replace('T', ' ').slice(0, -1) }] [${ level }]`;
+		const { Writable, } = require('stream'), stream = name => new Writable({ write(chunk, encoding, callback) {
+			if ((/^utf-?8$/i).test(encoding)) { encoding = ''; }
+			else if (encoding !== 'buffer') { chunk = global.Buffer.from(chunk, encoding); }
+			if (typeof chunk !== 'string') { chunk = chunk.toString('base64'); }
+			port.post(name, encoding, chunk);
+			callback && Promise.resolve().then(callback);
+		}, decodeStrings: false, });
+
+		const stdout = stream('stdout'), stderr = stream('stderr');
 		const console = new class extends require('console').Console {
 			constructor() { super(...arguments); }
-			log    (...args) { return super.log    (timespamp('log'),    ...args); }
-			info   (...args) { return super.info   (timespamp('info'),   ...args); }
-			warn   (...args) { return super.warn   (timespamp('warn'),   ...args); }
-			error  (...args) { return super.error  (timespamp('error'),  ...args); }
-			dir    (...args) { return super.dir    (timespamp('dir'),    ...args); }
-			trace  (...args) { return super.trace  (timespamp('trace'),  ...args); }
-			assert (...args) { return super.assert (timespamp('assert'), ...args); }
+			log    (...args) { return port.post('c.log',   ...args); }
+			info   (...args) { return port.post('c.info',  ...args); }
+			warn   (...args) { return port.post('c.warn',  ...args); }
+			error  (...args) { return port.post('c.error', ...args); }
 		}(stdout, stderr);
-		Object.defineProperty(global, 'console', { get() { return console; }, });
-		// TODO: could also log to 'setup' or a different 'channel'
-		// or (for firefox) just pipe everything to stderr, with is logged in the browser or extension console
-	}
-	// TODO: redirect uncaught errors
-}
 
+		Object.defineProperty(process, 'stdout', { get() { return stdout; }, });
+		Object.defineProperty(process, 'stderr', { get() { return stderr; }, });
+		Object.defineProperty(global, 'console', { get() { return console; }, });
+
+		process.on('uncaughtException', async error => !(await port.request('error', error)) && process.exit(1));
+		process.on('unhandledRejection', async error => !(await port.request('reject', error)) && process.exit(1));
+	}
+}
 
 
 // get extId and profDir
 const browser = process.argv[3]; let extId, extPath; {
-	const extPaths = JSON.parse(FS.readFileSync('./ext-paths.json', 'utf-8'));
-
 	switch (browser) {
 		case 'chromium': case 'chrome': {
 			extId = (/^chrome-extension:\/\/(.*)\/?$/).exec(process.argv[4])[1];
-			if (extPaths[extId]) { extPath = Path.resolve(extPaths[extId]); break; }
 			const { args, cwd, } = getBrowserArgs();
 			console.info({ args, cwd, });
 			throw new Error(`Not implemented`);
@@ -63,10 +64,8 @@ const browser = process.argv[3]; let extId, extPath; {
 		}
 		case 'firefox': {
 			extId = process.argv[5];
-			if (extPaths[extId]) { extPath = Path.resolve(extPaths[extId]); break; }
-
 			if (process.env.MOZ_CRASHREPORTER_EVENTS_DIRECTORY) {
-				extPath = Path.resolve(process.env.MOZ_CRASHREPORTER_EVENTS_DIRECTORY, '../../extensions', extId);
+				extPath = FS.realpathSync(Path.resolve(process.env.MOZ_CRASHREPORTER_EVENTS_DIRECTORY, '../../extensions', extId +'.xpi'));
 			} else {
 				throw new Error(`MOZ_CRASHREPORTER_EVENTS_DIRECTORY environment variable not set by Firefox`);
 				// const args = getBrowserArgs();
@@ -95,11 +94,12 @@ const browser = process.argv[3]; let extId, extPath; {
 { // set up file system
 	const extRoot = Path.resolve('/webext/');
 	let stat; try { stat = FS.statSync(extPath); } catch (error) { throw new Error(`Can't access extension at ${ extPath }`); }
-	let exec, extDir; if (stat.isDirectory()) {
+	let extDir; if (stat.isDirectory()) {
 		extDir = extPath;
-		exec = (key, path, args) => FS[key](extDir + path, ...args); // TODO: translate errors
 	} else {
-		throw new Error(`Not implemented`);
+		const tmp = require('tmp'); tmp.setGracefulCleanup(); // dirs are not being deleted
+		extDir = tmp.dirSync({ prefix: 'webext-', }).name;
+		(await new Promise((resolve, reject) => require('extract-zip')(extPath, { dir: extDir, unsafeCleanup: true, }, err => err ? reject(err) : resolve())));
 	}
 	const target = require('fs'), { URL, } = require('url'), { Buffer, } = global;
 	let url2path; {
@@ -123,7 +123,7 @@ const browser = process.argv[3]; let extId, extPath; {
 		if (
 			typeof path === 'string' && (path = Path.resolve(path))
 			&& path.startsWith(extRoot) && (path.length === extRoot.length || path[extRoot.length] === '\\' || path[extRoot.length] === '/')
-		) { return exec(key, path.slice(extRoot.length), args); }
+		) { return FS[key](extDir + path.slice(extRoot.length), ...args); } // TODO: translate errors?
 		return FS[key](arguments[0], ...args);
 	}));
 
@@ -141,7 +141,7 @@ const browser = process.argv[3]; let extId, extPath; {
 		const Module = require('module'), { _findPath, } = Module;
 		Module._findPath = function(path) {
 			path = _findPath(path);
-			if (path.startsWith(extDir) && (path.length === extDir.length || path[extDir.length] === '\\' || path[extDir.length] === '/'))
+			if (path && path.startsWith(extDir) && (path.length === extDir.length || path[extDir.length] === '\\' || path[extDir.length] === '/'))
 			{ path = extRoot + path.slice(extDir.length); }
 			return path;
 		};
@@ -161,4 +161,13 @@ port.addHandler('require', async (path, options, callback) => {
 	(await typeof exports !== 'object' ? callback(exports) : callback(...[].concat(...Object.entries(exports))));
 });
 
-console.info('running');
+console.info('native-ext running in', process.cwd());
+
+{ // cleanup
+	const { cache, } = require; // there are still references to the loaded modules ...
+	Object.keys(cache).forEach(key => delete cache[key]);
+	process.mainModule.children.splice(0, Infinity);
+	global.gc && global.gc();
+}
+
+})();

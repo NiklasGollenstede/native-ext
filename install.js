@@ -20,7 +20,7 @@ const execute = (bin, ...args) => new Promise((resolve, reject) => child_process
 ));
 
 const name = 'de.niklasg.native_ext'; // must match \w[\w.]*\w (so no '-')
-const node = process.argv[1].startsWith(require('path').resolve('/snapshot/')) ? '' : 'node'; // 'node-dwe --pipe=ioe --';
+const node = process.argv[1].startsWith(require('path').resolve('/snapshot/')) ? '' : 'node --inspect --expose-gc'; // 'node-dwe --pipe=ioe --';
 const os = process.platform;
 const windows = os === 'win32';
 const scriptExt = windows ? '.bat' : '.sh';

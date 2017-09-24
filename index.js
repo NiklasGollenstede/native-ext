@@ -1,13 +1,24 @@
 /* eslint-disable strict */ (function(global) { 'use strict'; define(async ({ /* global define, */ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 	'node_modules/web-ext-utils/browser/': { runtime, rootUrl, },
 	'node_modules/web-ext-utils/lib/multiport/': Port,
+	'node_modules/web-ext-utils/utils/event': { setEvent, },
+	exports,
 }) => {
 
 let port = null; const refs = new Map, cache = { __proto__: null, };
 
+const fireError  = setEvent(exports, 'onUncaughtException', { lazy: false, });
+const fireReject = setEvent(exports, 'onUnhandledRejection', { lazy: false, });
+
 async function require(path, { onDisconnect, } = { }) {
 	if (!port) {
 		port = new Port(runtime.connectNative('de.niklasg.native_ext'), Port.web_ext_Port);
+		port.addHandlers('c.', [ console.log, console.info, console.warn, console.error, ], console); // eslint-disable-line no-console
+		port.addHandlers({
+			stdout: (encoding, base64) => console.info('native-ext stdout:', encoding ? { encoding, base64, } : base64),
+			stderr: (encoding, base64) => console.warn('native-ext stderr:', encoding ? { encoding, base64, } : base64),
+		});
+		port.addHandler('error', error => fireError([ error, ])); port.addHandler('reject', error => fireReject([ error, ]));
 		port.ended.then(() => { port = null; refs.forEach(unref); Object.keys(cache).forEach(key => delete cache[key]); });
 	}
 
@@ -49,6 +60,10 @@ function unref(ref) {
 	return true;
 }
 
-return { require, unref, };
+function nuke() {
+	port && port.destroy();
+}
+
+Object.assign(exports, { require, unref, nuke, });
 
 }); })(this);

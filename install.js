@@ -32,13 +32,13 @@ async function install({ source, }) {
 	const binTarget = outPath('bin') + (windows && !node ? '.exe' : '');
 	const exec = (...args) => (windows ? '@echo off\r\n\r\n' : '#!/bin/bash\n\n')
 	+ (node ? node +` "${binTarget}"` : `"${binTarget}"`) // use absolute paths. The install dir can't be moved anyway
-	+' '+ args.map(_=>JSON.stringify(_)).join(' ');
+	+' '+ args.map(s => (/^(?:%[*\d]|\$[@\d]|\w+)$/).test(s) ? s : JSON.stringify(s)).join(' ');
 
-	const manifest = {
+	const manifest = browser => ({
 		name, description: 'WebExtensions native connector',
-		path: (windows ? '' : installDir +'/') +'connect'+ scriptExt,
+		path: (windows ? '' : installDir +'/') + browser + scriptExt,
 		type: 'stdio', // mandatory
-	};
+	});
 
 	try {
 		(await unlink(binTarget));
@@ -50,29 +50,36 @@ async function install({ source, }) {
 
 	(await Promise.all([
 		node ? symlink(source, binTarget, 'junction') : copyFile(source, binTarget).then(() => chmod(binTarget, '754')),
-		replaceFile(outPath('chrome.json'),  JSON.stringify(manifest, null, '\t'), 'utf8'),
-		replaceFile(outPath('firefox.json'), JSON.stringify(manifest, null, '\t'), 'utf8'),
+		replaceFile(outPath('chrome.json'),  JSON.stringify(manifest('chrome'), null, '\t'), 'utf8'),
+		replaceFile(outPath('firefox.json'), JSON.stringify(manifest('firefox'), null, '\t'), 'utf8'),
 		mkdir(outPath('vendors')).catch(_=>0),
 		...(windows ? [
-			replaceFile(outPath('connect.bat'), exec('connect', '%*'), 'utf8'),
 			execute('REG', 'ADD', 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\'+ name, '/ve', '/t', 'REG_SZ', '/d', outPath('chrome.json'),  '/f'),
 			execute('REG', 'ADD', 'HKCU\\Software\\Mozilla\\NativeMessagingHosts\\'+        name, '/ve', '/t', 'REG_SZ', '/d', outPath('firefox.json'), '/f'),
-			replaceFile(outPath('uninstall.bat'), exec('uninstall', '%*'), 'utf8'),
-			replaceFile(outPath('refresh.bat'), exec('refresh', '%*'), 'utf8'),
+			replaceFile(outPath('chrome.bat'),    exec('connect', 'chrome',   '%*'), { }),
+			replaceFile(outPath('firefox.bat'),   exec('connect', 'firefox',  '%*'), { }),
+			replaceFile(outPath('uninstall.bat'), exec('uninstall',           '%*'), { }),
+			replaceFile(outPath('refresh.bat'),   exec('refresh',             '%*'), { }),
 		] : [
-			replaceFile(outPath('connect.sh'), exec('connect', '$@'), { mode: '754', }),
-			replaceFile(outPath('uninstall.sh'), exec('uninstall', '$@'), { mode: '754', }),
-			replaceFile(outPath('refresh.sh'), exec('refresh', '$@'), { mode: '754', }),
+			replaceFile(outPath('chromium.sh'),   exec('connect', 'chromium', '$@'), { mode: '754', }),
+			replaceFile(outPath('chrome.sh'),     exec('connect', 'chrome',   '$@'), { mode: '754', }),
+			replaceFile(outPath('firefox.sh'),    exec('connect', 'firefox',  '$@'), { mode: '754', }),
+			replaceFile(outPath('uninstall.sh'),  exec('uninstall',           '$@'), { mode: '754', }),
+			replaceFile(outPath('refresh.sh'),    exec('refresh',             '$@'), { mode: '754', }),
 		]),
 	]));
 
 	os === 'linux' && (await Promise.all([
-		...[ 'chromium', 'google-chrome', ]
-		.map(chr => mkdir(outPath(`../.config/`)).catch(_=>0)
-		.then(() => mkdir(outPath(`../.config/${chr}`)).catch(_=>0))
-		.then(() => mkdir(outPath(`../.config/${chr}/NativeMessagingHosts`)).catch(_=>0))
-		.then(() =>unlink(outPath(`../.config/${chr}/NativeMessagingHosts/${ name }.json`)).catch(_=>0))
-		.then(() => symlink(outPath(`chrome.json`), outPath(`../.config/${chr}/NativeMessagingHosts/${ name }.json`)))),
+		/*chromium*/mkdir(outPath(`../.config/`)).catch(_=>0)
+		.then(() => mkdir(outPath(`../.config/chromium`)).catch(_=>0))
+		.then(() => mkdir(outPath(`../.config/chromium/NativeMessagingHosts`)).catch(_=>0))
+		.then(() =>unlink(outPath(`../.config/chromium/NativeMessagingHosts/${ name }.json`)).catch(_=>0))
+		.then(() => symlink(outPath(`chrome.json`), outPath(`../.config/chromium/NativeMessagingHosts/${ name }.json`))),
+		/*chrome*/  mkdir(outPath(`../.config/`)).catch(_=>0)
+		.then(() => mkdir(outPath(`../.config/google-chrome`)).catch(_=>0))
+		.then(() => mkdir(outPath(`../.config/google-chrome/NativeMessagingHosts`)).catch(_=>0))
+		.then(() =>unlink(outPath(`../.config/google-chrome/NativeMessagingHosts/${ name }.json`)).catch(_=>0))
+		.then(() => symlink(outPath(`chrome.json`), outPath(`../.config/google-chrome/NativeMessagingHosts/${ name }.json`))),
 		/*firefox*/ mkdir(outPath(`../.mozilla/`)).catch(_=>0)
 		.then(() => mkdir(outPath(`../.mozilla/native-messaging-hosts`)).catch(_=>0))
 		.then(() =>unlink(outPath(`../.mozilla/native-messaging-hosts/${ name }.json`)).catch(_=>0))
@@ -94,8 +101,6 @@ async function install({ source, }) {
 		.then(() =>unlink(outPath(`../Mozilla/NativeMessagingHosts/${ name }.json`)).catch(_=>0))
 		.then(() => symlink(outPath('firefox.json'), outPath(`../Mozilla/NativeMessagingHosts/${ name }.json`))),
 	]));
-
-	// TODO: MAC
 
 	(await refresh(arguments[0]));
 }

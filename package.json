@@ -8,11 +8,12 @@
 		"type": "git",
 		"url": "git@github.com:NiklasGollenstede/native-ext.git"
 	},
-	"dependencies": {
-		"rimraf": "2.6.1",
-		"multiport": "0.1.0"
+	"peerDependencies": {
+		"web-ext-utils": "0.0.13"
 	},
 	"devDependencies": {
+		"multiport": "0.2.1",
+		"rimraf": "2.6.1",
 		"pkg": "4.2.3",
 		"babel-eslint": "7.1.1",
 		"eslint": "3.14.1",

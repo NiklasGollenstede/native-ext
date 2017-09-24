@@ -14,11 +14,6 @@ switch (args[0]) {
 		dialog('info', 'Native-Ext', `Operation ${ command } successful`);
 	} break;
 	case 'connect': {
-		// chrome sends "chrome-extension://"... as (first(?)) arg (and on windows a handle to the main window (as second arg?))
-
-		// firefox sends the path to the manifest (firefox.json) as the first arg and (since ff55) the extensions id as second arg
-		// but for some reason (the .bat indirection?) those seem to end up in a single space separated arg
-
 		require('./connect.js');
 	} break;
 	default: {

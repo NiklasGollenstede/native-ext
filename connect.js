@@ -1,6 +1,7 @@
 'use strict'; const ready = (async () => { (await null);
 
-//	(await new Promise(done => setTimeout(done, 2000))); /*debugger;*/
+const FS = Object.assign({ }, require('fs')), Path = require('path');
+
 
 // set up communication
 const Port = require('multiport'), port = new Port(
@@ -9,98 +10,67 @@ const Port = require('multiport'), port = new Port(
 );
 { const { stdin, } = process; stdin.pause();  ready.then(() => stdin.resume()); }
 
-const FS = global.FS = Object.assign({ }, require('fs')), Path = require('path');
 
 { // can't log to stdio if started by the browser ==> forward to browser console
-	if (process.versions.electron) { // started in debug mode, console is fine, but need to redirect stdio to it
-		const { Writable, } = require('stream'), stream = name => new Writable({ write(chunk, encoding, callback) {
-			console.log(name, chunk); callback && Promise.resolve().then(callback); // eslint-disable-line
+	const { Writable, } = require('stream'); let stream;
+	if (process.versions.electron) { // console is fine (doesn't write to stdio), but need to redirect explicit stdio writes to it
+		stream = name => new Writable({ write(chunk, encoding, callback) {
+			console.log(name, chunk, encoding); callback && Promise.resolve().then(callback); // eslint-disable-line
 		}, });
-
-		const stdout = stream('stdout'), stderr = stream('stderr');
-		Object.defineProperty(process, 'stdout', { get() { return stdout; }, });
-		Object.defineProperty(process, 'stderr', { get() { return stderr; }, });
 	} else {
-		const { Writable, } = require('stream'), stream = name => new Writable({ write(chunk, encoding, callback) {
+		stream = name => new Writable({ write(chunk, encoding, callback) {
 			if ((/^utf-?8$/i).test(encoding)) { encoding = ''; }
 			else if (encoding !== 'buffer') { chunk = global.Buffer.from(chunk, encoding); }
 			if (typeof chunk !== 'string') { chunk = chunk.toString('base64'); }
 			port.post(name, encoding, chunk);
 			callback && Promise.resolve().then(callback);
 		}, decodeStrings: false, });
-
-		const stdout = stream('stdout'), stderr = stream('stderr');
-		const console = new class extends require('console').Console {
-			constructor() { super(...arguments); }
-			log    (...args) { return port.post('c.log',   ...args); }
-			info   (...args) { return port.post('c.info',  ...args); }
-			warn   (...args) { return port.post('c.warn',  ...args); }
-			error  (...args) { return port.post('c.error', ...args); }
-		}(stdout, stderr);
-
-		Object.defineProperty(process, 'stdout', { get() { return stdout; }, });
-		Object.defineProperty(process, 'stderr', { get() { return stderr; }, });
-		Object.defineProperty(global, 'console', { get() { return console; }, });
-
-		process.on('uncaughtException', async error => !(await port.request('error', error)) && process.exit(1));
-		process.on('unhandledRejection', async error => !(await port.request('reject', error)) && process.exit(1));
 	}
+	const stdout = stream('stdout'), stderr = stream('stderr');
+	Object.defineProperty(process, 'stdout', { value: stdout, });
+	Object.defineProperty(process, 'stderr', { value: stderr, });
+
+	process.on('uncaughtException', async error => !(await port.request('error', error)) && process.exit(1));
+	process.on('unhandledRejection', async error => !(await port.request('reject', error)) && process.exit(1));
 }
 
 
-// get extId and profDir
-const browser = process.argv[3]; let extId, extPath; {
-	switch (browser) {
-		case 'chromium': case 'chrome': {
-			extId = (/^chrome-extension:\/\/(.*)\/?$/).exec(process.argv[4])[1];
-			const { args, cwd, } = getBrowserArgs();
-			console.info({ args, cwd, });
-			throw new Error(`Not implemented`);
-			// defaults:
-			// %LOCALAPPDATA%\Google\Chrome\User Data\Default
-			// ~/.config/google-chrome/Default/Extensions/
-			// ~/.config/chromium/Default/Extensions
-			// ~/Library/Application\ Support/Google/Chrome/Default/Extensions
-		}
-		case 'firefox': {
-			extId = process.argv[5];
-			if (process.env.MOZ_CRASHREPORTER_EVENTS_DIRECTORY) {
-				extPath = FS.realpathSync(Path.resolve(process.env.MOZ_CRASHREPORTER_EVENTS_DIRECTORY, '../../extensions', extId +'.xpi'));
-			} else {
-				throw new Error(`MOZ_CRASHREPORTER_EVENTS_DIRECTORY environment variable not set by Firefox`);
-				// const args = getBrowserArgs();
-				// -P / -p "profile_name"
-				// -profile "profile_path" (precedence?)
-				// otherwise: FS.readFileSync('%AppData%\Mozilla\Firefox\profiles.ini').trim().split(/(?:\r\n?\n){2}/g).find(_=>_.includes('Default=1')).match(/Path=(.*))[1]
-			}
-		} break;
-		default: throw new Error(`Unknown browser ${ process.argv[2] }`);
-	}
-
-	function getBrowserArgs() {
-		const exec = require('child_process').execFileSync;
-		switch (process.platform) {
-			case 'win32': {
-				const ppid =  exec('wmic', `process where processId=${ process.pid } get parentprocessid`.split(' '), { encoding: 'utf-8', }).match(/\d+/)[0];
-				const pppid = exec('wmic', `process where processId=${ ppid } get parentprocessid`.split(' '), { encoding: 'utf-8', }).match(/\d+/)[0];
-				return { cwd: null, args: exec('wmic', `process where processId=${ pppid } get CommandLine`.split(' '), { encoding: 'utf-8', }).slice('CommandLine'.length + 2).trim(), };
-			}
-			default: throw new Error(`Unknown OS ${ process.platform }`);
-		}
-	}
+const modules = { __proto__: null, }; { // extend require
+	const Module = require('module'), { _resolveFilename, _load, } = Module;
+	Module._resolveFilename = function(path, mod) {
+		if (path in modules) { return path; }
+		return _resolveFilename(path, mod);
+	};
+	Module._load = function(path) {
+		if (path in modules) { return modules[path]; }
+		return _load.apply(null, arguments);
+	};
 }
 
 
-{ // set up file system
-	const extRoot = Path.resolve('/webext/');
-	let stat; try { stat = FS.statSync(extPath); } catch (error) { throw new Error(`Can't access extension at ${ extPath }`); }
-	let extDir; if (stat.isDirectory()) {
-		extDir = extPath;
-	} else {
+{ // load and expose 'ffi' and 'ref'
+	require('bindings'); const module = require.cache[require.resolve('bindings')], { exports, } = module;
+	[ 'ref', 'ffi', ].forEach(name => {
+		module.exports = () => module.require(Path.join(process.cwd(), `res/${name}.node`));
+		modules[name] = module.require(name);
+	});
+	module.exports = exports;
+}
+
+
+// (lazily) load and expose 'browser' infos
+const browser = modules.browser = require('./browser.js');
+
+
+// set up file system
+const extRoot = Path.resolve('/webext/'); let extDir; {
+	({ extDir, } = browser); if (!extDir) { if (browser.extFile) {
 		const tmp = require('tmp'); tmp.setGracefulCleanup(); // dirs are not being deleted
 		extDir = tmp.dirSync({ prefix: 'webext-', }).name;
-		(await new Promise((resolve, reject) => require('extract-zip')(extPath, { dir: extDir, unsafeCleanup: true, }, err => err ? reject(err) : resolve())));
-	}
+		(await new Promise((resolve, reject) => require('extract-zip')(browser.extFile, { dir: extDir, unsafeCleanup: true, }, err => err ? reject(err) : resolve())));
+	} else {
+		throw new Error(`Can't find extension on disk`);
+	} }
 	const target = require('fs'), { URL, } = require('url'), { Buffer, } = global;
 	let url2path; {
 		const dummy = { __proto__: FS.ReadStream.prototype, path: null, _events: 42, }, options = { start: '', encoding: 'utf-8', };
@@ -146,16 +116,23 @@ const browser = process.argv[3]; let extId, extPath; {
 			return path;
 		};
 	}
+}
+
+
+{ // general process fixes
+	process.versions.native_ext = module.require(Path.join(__dirname, 'package.json')).version;
+	process.argv.splice(0, Infinity);
 	process.mainModule.filename = extRoot + Path.sep +'.';
 	process.mainModule.paths = module.constructor._nodeModulePaths(extRoot + Path.sep +'.');
+	process.mainModule.exports = null;
+	process.mainModule.children.splice(0, Infinity);
 	process.chdir(extDir);
 }
 
-port.addHandler(function ping() { return 'pong'; });
 
 port.addHandler('require', async (path, options, callback) => {
 	if (!(/\bn(?:ative|ode)\.js$|(?:^|[\\\/])n(?:ative|ode)[\\\/]/).test(path)) {
-		throw new Error(`path must contain /node/ or /native/ or end with \bnode.js or \bnative.js`);
+		throw new Error(`path must contain /node/ or /native/ or end with \\bnode.js or \\bnative.js`);
 	}
 	const exports = (await process.mainModule.require(Path.join('/webext/', path)));
 	(await typeof exports !== 'object' ? callback(exports) : callback(...[].concat(...Object.entries(exports))));
@@ -163,10 +140,10 @@ port.addHandler('require', async (path, options, callback) => {
 
 console.info('native-ext running in', process.cwd());
 
+
 { // cleanup
 	const { cache, } = require; // there are still references to the loaded modules ...
 	Object.keys(cache).forEach(key => delete cache[key]);
-	process.mainModule.children.splice(0, Infinity);
 	global.gc && global.gc();
 }
 

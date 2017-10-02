@@ -16,16 +16,25 @@
 		"eslint": "3.14.1",
 		"eslintrc": "NiklasGollenstede/eslintrc",
 		"extract-zip": "1.6.5",
+		"ffi": "2.2.0",
 		"multiport": "0.2.1",
 		"pkg": "4.2.3",
+		"ref-struct": "^1.1.0",
 		"rimraf": "2.6.1",
 		"tmp": "0.0.33"
 	},
 	"main": "start.js",
+	"bin": "start.js",
+	"pkg": {
+		"assets": [
+			"node_modules/ref/build/Release/binding.node",
+			"node_modules/ffi/build/Release/ffi_bindings.node"
+		]
+	},
 	"scripts": {
 		"test": "mocha test/selenium --recursive",
-		"build": "pkg start.js -o release/native-ext -t node8.3",
-		"build-all": "pkg start.js -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64",
+		"build": "node pkg . -o release/native-ext -t node8.3 --public",
+		"build-all": "node pkg . -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64 --public",
 		"lint": "eslint --ignore-path .gitignore ."
 	},
 	"eslintConfig": {

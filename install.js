@@ -20,7 +20,8 @@ const execute = (bin, ...args) => new Promise((resolve, reject) => child_process
 ));
 
 const name = 'de.niklasg.native_ext'; // must match \w[\w.]*\w (so no '-')
-const node = process.argv[1].startsWith(require('path').resolve('/snapshot/')) ? '' : 'node --inspect --expose-gc'; // 'node-dwe --pipe=ioe --';
+const nodeOptions = process.argv.find(_=>_.startsWith('--node-options='));
+const node = process.argv[1].startsWith(Path.resolve('/snapshot/')) ? '' : 'node'+ (nodeOptions ? ' '+ nodeOptions.slice(15).replace(/,/g, ' ') : '');
 const os = process.platform;
 const windows = os === 'win32';
 const scriptExt = windows ? '.bat' : '.sh';
@@ -47,9 +48,10 @@ async function install({ source, }) {
 	} }
 
 	try { (await mkdir(installDir)); } catch (_) { }
+	try { (await mkdir(installDir +'/res')); } catch (_) { }
 
 	(await Promise.all([
-		node ? symlink(source, binTarget, 'junction') : copyFile(source, binTarget).then(() => chmod(binTarget, '754')),
+		node ? symlink(source, binTarget, 'junction') : copyFile(binTarget, source).then(() => chmod(binTarget, '754')),
 		replaceFile(outPath('chrome.json'),  JSON.stringify(manifest('chrome'), null, '\t'), 'utf8'),
 		replaceFile(outPath('firefox.json'), JSON.stringify(manifest('firefox'), null, '\t'), 'utf8'),
 		mkdir(outPath('vendors')).catch(_=>0),
@@ -67,6 +69,8 @@ async function install({ source, }) {
 			replaceFile(outPath('uninstall.sh'),  exec('uninstall',           '$@'), { mode: '754', }),
 			replaceFile(outPath('refresh.sh'),    exec('refresh',             '$@'), { mode: '754', }),
 		]),
+		readFile(Path.join(__dirname, 'node_modules/ref/build/Release/binding.node')).then(data => replaceFile(outPath('res/ref.node'), data)),
+		readFile(Path.join(__dirname, 'node_modules/ffi/build/Release/ffi_bindings.node')).then(data => replaceFile(outPath('res/ffi.node'), data)),
 	]));
 
 	os === 'linux' && (await Promise.all([
@@ -152,7 +156,7 @@ async function uninstall() {
 
 module.exports = { install, refresh, uninstall, };
 
-function copyFile(source, target) { return new Promise((resolve, reject) => {
+function copyFile(target, source) { return new Promise((resolve, reject) => {
 	const read = FS.createReadStream(source), write = FS.createWriteStream(target);
 	read.on('error', failed); write.on('error', failed); write.on('finish', resolve);
 	function failed(error) { read.destroy(); write.end(); reject(error); }

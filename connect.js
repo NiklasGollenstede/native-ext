@@ -1,6 +1,10 @@
 'use strict'; const ready = (async () => { (await null);
 
-const FS = Object.assign({ }, require('fs')), Path = require('path');
+/**
+ * This module is run once on startup and prepares the process to run the node.js modules provided by the connecting extension.
+ */
+
+const FS = Object.assign({ }, require('fs')), Path = require('path'), _package = module.require(Path.join(__dirname, 'package.json'));
 
 
 // set up communication
@@ -8,7 +12,7 @@ const Port = require('multiport'), port = new Port(
 	new (require('./runtime-port.js'))(process.stdin, process.stdout),
 	Port.web_ext_Port,
 );
-{ const { stdin, } = process; stdin.pause();  ready.then(() => stdin.resume()); }
+// { const { stdin, } = process; stdin.pause(); ready.then(() => stdin.resume()); }
 
 
 { // can't log to stdio if started by the browser ==> forward to browser console
@@ -35,6 +39,13 @@ const Port = require('multiport'), port = new Port(
 }
 
 
+let protocol; { // protocol negotiation
+	const remote = (await new Promise(done => port.addHandler('init', opts => { done(opts); port.removeHandler('init'); return ready; })));
+	const local = [ '0.2', ]; protocol = remote.versions.find(_=>local.includes(_));
+	if (!protocol) { throw new Error(`Protocol version mismatch, extension supports ${remote.versions} and the installed version ${_package.version} of NativeExt supports ${local}`); }
+}
+
+
 const modules = { __proto__: null, }; { // extend require
 	const Module = require('module'), { _resolveFilename, _load, } = Module;
 	Module._resolveFilename = function(path, mod) {
@@ -55,11 +66,12 @@ const modules = { __proto__: null, }; { // extend require
 		modules[name] = module.require(name);
 	});
 	module.exports = exports;
+	modules['ref-array'] = require('ref-array'); modules['ref-struct'] = require('ref-struct');
 }
 
 
 // (lazily) load and expose 'browser' infos
-const browser = modules.browser = require('./browser.js');
+const browser = modules.browser = require('./browser.js')(protocol);
 
 
 // set up file system
@@ -120,7 +132,7 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 
 
 { // general process fixes
-	process.versions.native_ext = module.require(Path.join(__dirname, 'package.json')).version;
+	process.versions.native_ext = _package.version;
 	process.argv.splice(0, Infinity);
 	process.mainModule.filename = extRoot + Path.sep +'.';
 	process.mainModule.paths = module.constructor._nodeModulePaths(extRoot + Path.sep +'.');
@@ -130,15 +142,16 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 }
 
 
-port.addHandler('require', async (path, options, callback) => {
-	if (!(/\bn(?:ative|ode)\.js$|(?:^|[\\\/])n(?:ative|ode)[\\\/]/).test(path)) {
-		throw new Error(`path must contain /node/ or /native/ or end with \\bnode.js or \\bnative.js`);
-	}
-	const exports = (await process.mainModule.require(Path.join('/webext/', path)));
-	(await typeof exports !== 'object' ? callback(exports) : callback(...[].concat(...Object.entries(exports))));
+// add permanent handlers
+port.addHandlers({
+	async require(path, options, callback) {
+		if (!(/\bn(?:ative|ode)\.js$|(?:^|[\\\/])n(?:ative|ode)[\\\/]/).test(path)) {
+			throw new Error(`path must contain /node/ or /native/ or end with \\bnode.js or \\bnative.js`);
+		}
+		const exports = (await process.mainModule.require(Path.join('/webext/', path)));
+		(await typeof exports !== 'object' ? callback(exports) : callback(...[].concat(...Object.entries(exports))));
+	},
 });
-
-console.info('native-ext running in', process.cwd());
 
 
 { // cleanup
@@ -146,5 +159,6 @@ console.info('native-ext running in', process.cwd());
 	Object.keys(cache).forEach(key => delete cache[key]);
 	global.gc && global.gc();
 }
+console.info('native-ext running in', process.cwd());
 
 })();

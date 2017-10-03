@@ -5,68 +5,90 @@
 	exports,
 }) => {
 
-let port = null, channel = null; const refs = new Map, cache = { __proto__: null, };
+let channel = null; const refs = new WeakMap, cache = { __proto__: null, };
 
 const fireError  = setEvent(exports, 'onUncaughtException', { lazy: false, });
 const fireReject = setEvent(exports, 'onUnhandledRejection', { lazy: false, });
 
-async function require(path, { onDisconnect, } = { }) {
-	if (!port) {
-		channel = runtime.connectNative('de.niklasg.native_ext'); port = new Port(channel, Port.web_ext_Port);
-		port.addHandlers('c.', [ console.log, console.info, console.warn, console.error, ], console); // eslint-disable-line no-console
-		port.addHandlers({
-			stdout: (encoding, base64) => console.info('native-ext stdout:', encoding ? { encoding, base64, } : base64),
-			stderr: (encoding, base64) => console.warn('native-ext stderr:', encoding ? { encoding, base64, } : base64),
-		});
-		port.addHandler('error', error => fireError([ error, ])); port.addHandler('reject', error => fireReject([ error, ]));
-		port.ended.then(() => { port = channel = null; refs.forEach(unref); Object.keys(cache).forEach(key => delete cache[key]); });
-	}
-	let disconnected; channel.onDisconnect.addListener(() => { disconnected = channel.error || runtime.lastError; });
+function connect() {
+	if (channel) { return channel.port; }
 
-	path = global.require.toUrl(path).replace(/(?:\.js)?$/, '.js').slice(rootUrl.length - 1);
+	// launch
+	channel = runtime.connectNative('de.niklasg.native_ext'); const port = channel.port = new Port(channel, Port.web_ext_Port);
 
-	const ref = { }, funcs = [ ]; try { refs.set(ref, null);
+	// handle errors
+	channel.onDisconnect.addListener(() => {
+		port.error = Object.freeze(channel.error || runtime.lastError || new Error(`Native process was terminated`));
+	}); port.ended.then(disconnect);
 
-		let exports, resolve; const [ entries, ] = (await (cache[path] || (cache[path] = Promise.all([
-			new Promise(_=>(resolve=_)), port.request('require', path, null, (...args) => resolve(args)),
-		]))));
+	// setup
+	port.addHandlers('init.', { }); // for future requests
+	port.inited = port.request('init', { versions: [ '0.2', ], }).then(version => (port.version = version));
 
-		if (entries.length === 1) {
-			const value = entries[0]; exports = typeof value === 'function' ? wrapFunc(value) : value;
-		} else {
-			exports = { }; for (let i = 0; i < entries.length; i += 2) {
-				const key = entries[i], value = entries[i +1];
-				exports[key] = typeof value === 'function' ? wrapFunc(value) : value;
-			}
-		}
-		refs.set(exports, funcs); port.ended.then(() => onDisconnect(disconnected));
-		return exports;
-	}
-	catch (error) { throw disconnected || error; }
-	finally { refs.delete(ref); refs.size === 0 && port && port.destroy(); }
+	// handle messages
+	port.addHandlers('c.', [ console.log, console.info, console.warn, console.error, ], console); // eslint-disable-line no-console
+	port.addHandlers({
+		stdout: (encoding, base64) => console.info('native-ext stdout:', encoding ? { encoding, base64, } : base64),
+		stderr: (encoding, base64) => console.warn('native-ext stderr:', encoding ? { encoding, base64, } : base64),
+	});
+	port.addHandler('error', error => fireError([ error, ])); port.addHandler('reject', error => fireReject([ error, ]));
 
-	function wrapFunc(func) {
-		let closed = false; funcs.push(() => (closed = true));
-		return function(...args) { if (closed) {
-			throw new Error(`Can't use method of unrefed module`);
-		} else {
-			return func(...args);
-		} };
-	}
+	return port;
 }
 
+function disconnect() {
+	if (!channel) { return; } const { port, } = channel, { error, } = port; channel = null; port.destroy();
+	refs.forEach(obj => { try { refs.delete(obj); obj.doClose(); obj.onDisconnect && obj.onDisconnect(error); } catch (error) { console.error(error); } });
+	Object.keys(cache).forEach(key => delete cache[key]);
+}
+
+async function require(path, { onDisconnect, } = { }) { const ref = { }, port = connect(); {
+	refs.set(ref, null); // add temporary reference
+} try {
+
+	let disconnected; channel.onDisconnect.addListener(() => {
+		disconnected = Object.freeze(channel.error || runtime.lastError || new Error(`Native process was terminated`));
+	});
+	(await port.inited);
+
+	// get (cached) remote refs or values
+	path = global.require.toUrl(path).replace(/(?:\.js)?$/, '.js').slice(rootUrl.length - 1);
+	let exports, resolve; const [ entries, ] = (await (cache[path] || (cache[path] = Promise.all([
+		new Promise(_=>(resolve=_)), port.request('require', path, null, (...args) => resolve(args)),
+	]))));
+
+	// create a unique exports object
+	let closed = null; function doClose() { closed = disconnected || new Error(`Can't use method of unrefed module`); }
+	function wrapFunc(func) { return function(...args) { if (closed) { throw closed; } else { return func(...args); } }; }
+	if (entries.length === 1) { // non-object
+		const value = entries[0]; if (typeof value === 'function') { exports = wrapFunc(value); } else { return value; }
+	} else { // object properties, every second entry is a value that may be a remote function
+		exports = { }; for (let i = 0; i < entries.length; i += 2) {
+			const key = entries[i], value = entries[i +1];
+			exports[key] = typeof value === 'function' ? wrapFunc(value) : value;
+		}
+	}
+
+	refs.set(exports, { doClose, onDisconnect, }); // add permanent reference
+	return exports;
+
+} catch (error) {
+	throw port.error || error; // if something went wrong with the port, then that is the actual problem
+} finally {
+	refs.delete(ref); refs.size === 0 && port && port.destroy(); // drop temporary reference
+} }
+
 function unref(ref) {
-	const funcs = refs.get(ref);
-	if (!funcs) { return refs.delete(ref); }
-	refs.delete(ref); refs.size === 0 && port && port.destroy();
-	funcs.forEach(_=>_());
+	const it = refs.get(ref);
+	if (it === undefined) { return false; }
+	refs.delete(ref); refs.size === 0 && disconnect();
+	it && it.doClose();
 	return true;
 }
 
-function nuke() {
-	port && port.destroy();
-}
-
-Object.assign(exports, { require, unref, nuke, });
+Object.assign(exports, {
+	require, unref, nuke: disconnect,
+	get version() { return channel && channel.port.version; },
+});
 
 }); })(this);

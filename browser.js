@@ -1,9 +1,21 @@
-'use strict';
+'use strict'; module.exports = version => { const browser = { };
+
+/**
+ * This module collects and exposes information about the connecting browser and extension.
+ * It is available as 'browser' for the extension modules.
+ */
 
 const FS = require('fs'), Path = require('path');
 
-const browser = exports;
+void version; // nothing version specific so far
 
+
+// 'chromium', 'chrome' or 'firefox'
+browser.name = process.argv[3];
+
+
+/// pid of the browser main process
+lazy(browser, 'pid', getBrowserPid);
 function getBrowserPid() { switch (process.platform) {
 	case 'win32': {
 		const ffi = require('ffi'), { alloc, types, refType, } = require('ref'), tpVoid = refType(types.void);
@@ -18,11 +30,11 @@ function getBrowserPid() { switch (process.platform) {
 			], ],
 		});
 
-		const tProcBasicInfo = require('ref-struct')({
+		const Struct = require('ref-struct'), ArrayType = require('ref-array');
+		const tProcBasicInfo = Struct({
 			Reserved1: tpVoid,
-			PebBaseAddress: tpVoid,
-			Reserved2a: tpVoid,
-			Reserved2b: tpVoid,
+			PebBaseAddress: tpVoid, // refType(tPEB),
+			Reserved2: ArrayType(tpVoid, 2),
 			UniqueProcessId: tpVoid,
 			Reserved3: types.ulong,
 		});
@@ -43,22 +55,23 @@ function getBrowserPid() { switch (process.platform) {
 
 		return ppid(ppid(process.pid));
 	}
+	case 'linux': throw new Error(`Not implemented`);
+	case 'darwin': throw new Error(`Not implemented`);
 	default: throw new Error(`Unknown OS ${ process.platform }`);
 } }
-lazy(browser, 'pid', getBrowserPid);
+
 
 { // get extId, profileDir and extDir or extFile
-	switch (process.argv[3]) {
+	switch (browser.name) {
 		case 'chromium': case 'chrome': {
 			const extId = browser.extId = (/^chrome-extension:\/\/(.*)\/?$/).exec(process.argv[4])[1];
 			const pid = browser.pid;
 			console.info({ extId, pid, }, getBrowserArgs());
 			throw new Error(`Not implemented`);
-			// defaults:
-			// %LOCALAPPDATA%\Google\Chrome\User Data\Default
-			// ~/.config/google-chrome/Default/Extensions/
-			// ~/.config/chromium/Default/Extensions
-			// ~/Library/Application\ Support/Google/Chrome/Default/Extensions
+			// defaults: https://chromium.googlesource.com/chromium/src/+/master/docs/user_data_dir.md
+			// besides `--user-data-dir=./test_dir` the cli
+			// can contain `--user-data-dir=".\test dir"` or `"--user-data-dir=.\test dir"` on windows
+			// and (probably) also `--user-data-dir=./test\ dir` on mac/linux
 		}
 		case 'firefox': {
 			const extId = browser.extId = process.argv[5];
@@ -74,18 +87,22 @@ lazy(browser, 'pid', getBrowserPid);
 				// otherwise: FS.readFileSync('%AppData%\Mozilla\Firefox\profiles.ini').trim().split(/(?:\r\n?\n){2}/g).find(_=>_.includes('Default=1')).match(/Path=(.*))[1]
 			}
 		} break;
-		default: throw new Error(`Unknown browser ${ process.argv[2] }`);
+		default: throw new Error(`Unknown browser ${ browser.name }`);
 	}
 
 	function getBrowserArgs() {
 		const exec = require('child_process').execFileSync;
 		switch (process.platform) {
 			case 'win32': {
-				return { cwd: null, command: exec(
+				const command = exec(
 					'wmic', `process where processId=${ browser.pid } get CommandLine`.split(' '),
 					{ encoding: 'utf-8', }
-				).slice('CommandLine'.length + 2).trim(), };
+				).slice('CommandLine'.length + 2).trim();
+				const args = [ ]; command.replace(/".*?"|(?:[^\s\\]|\\ |\\)+(?:".*?")?/g, s => (args.push(s), ''));
+				return { cwd: null, args, };
 			}
+			case 'linux': throw new Error(`Not implemented`);
+			case 'darwin': throw new Error(`Not implemented`);
 			default: throw new Error(`Unknown OS ${ process.platform }`);
 		}
 	}
@@ -99,3 +116,5 @@ function lazy(obj, prop, getter) {
 		return value;
 	}, });
 }
+
+return browser; };

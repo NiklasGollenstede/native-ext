@@ -8,11 +8,10 @@ const FS = Object.assign({ }, require('fs')), Path = require('path'), _package =
 
 
 // set up communication
-const Port = require('multiport'), port = new Port(
+const Port = require('./node_modules/multiport/index.js'), port = new Port(
 	new (require('./runtime-port.js'))(process.stdin, process.stdout),
 	Port.web_ext_Port,
 );
-// { const { stdin, } = process; stdin.pause(); ready.then(() => stdin.resume()); }
 
 
 { // can't log to stdio if started by the browser ==> forward to browser console
@@ -46,32 +45,66 @@ let protocol; { // protocol negotiation
 }
 
 
-const modules = { __proto__: null, }; { // extend require
+const modules = { __proto__: null, }; let originalRequireResolve; { // extend require
 	const Module = require('module'), { _resolveFilename, _load, } = Module;
-	Module._resolveFilename = function(path, mod) {
+	originalRequireResolve = _resolveFilename;
+	Module._resolveFilename = function(path) {
 		if (path in modules) { return path; }
-		return _resolveFilename(path, mod);
+		return _resolveFilename.apply(Module, arguments);
 	};
 	Module._load = function(path) {
 		if (path in modules) { return modules[path]; }
-		return _load.apply(null, arguments);
+		return _load.apply(Module, arguments);
 	};
+} function exposeLazy(name, getter) {
+	Object.defineProperty(modules, name, { configurable: true, enumerable: true, get() {
+		const value = getter();
+		Object.defineProperty(modules, name, { value, });
+		return value;
+	}, });
 }
 
 
-{ // load and expose 'ffi' and 'ref'
-	require('bindings'); const module = require.cache[require.resolve('bindings')], { exports, } = module;
-	[ 'ref', 'ffi', ].forEach(name => {
-		module.exports = () => module.require(Path.join(process.cwd(), `res/${name}.node`));
-		modules[name] = module.require(name);
-	});
-	module.exports = exports;
-	modules['ref-array'] = require('ref-array'); modules['ref-struct'] = require('ref-struct');
+{ // expose and lazy load 'ffi' and 'ref'
+	const cwd = process.cwd(), bindingsPath = require.resolve('bindings'); let bindingsModule;
+
+	exposeLazy('ffi', makeLazyLoader('ffi', () => void modules.ref));
+	exposeLazy('ref', makeLazyLoader('ref'));
+	exposeLazy('ref-array', () => requireClean('ref-array'));
+	exposeLazy('ref-struct', () => requireClean('ref-struct'));
+
+	function makeLazyLoader(name, precond) { return () => {
+		precond && precond();
+		if (!bindingsModule) { require(bindingsPath); bindingsModule = require.cache[bindingsPath]; }
+		const bindingsExports = bindingsModule.exports;
+		const nodePath = Path.join(cwd, `res/${name}.node`);
+		bindingsModule.exports = () => module.require(nodePath);
+		let exports; try {
+			exports = requireClean(name);
+		} finally {
+			bindingsModule.exports = bindingsExports;
+			delete require.cache[nodePath];
+			delete require.cache[bindingsPath];
+		} return exports;
+	}; }
+
+	function requireClean(id) { // use local require and original cwd, restore and cleanup afterwards
+		let exports, currentCwd; try {
+			currentCwd = process.cwd(); process.chdir(cwd);
+			const fullPath = originalRequireResolve(id, module);
+			exports = require(fullPath);
+			(function clear(module) {
+				delete require.cache[module.filename] && module.children.forEach(clear);
+			})(require.cache[fullPath]);
+		} finally {
+			process.chdir(currentCwd);
+		} return exports;
+	}
 }
 
 
-// (lazily) load and expose 'browser' infos
-const browser = modules.browser = require('./browser.js')(protocol);
+// load and expose 'browser' infos
+const browser = modules.browser = (await require('./browser.js')({ versions: protocol, port, }));
 
 
 // set up file system
@@ -122,7 +155,7 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 	{
 		const Module = require('module'), { _findPath, } = Module;
 		Module._findPath = function(path) {
-			path = _findPath(path);
+			path = _findPath.apply(Module, arguments);
 			if (path && path.startsWith(extDir) && (path.length === extDir.length || path[extDir.length] === '\\' || path[extDir.length] === '/'))
 			{ path = extRoot + path.slice(extDir.length); }
 			return path;
@@ -135,7 +168,7 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 	process.versions.native_ext = _package.version;
 	process.argv.splice(0, Infinity);
 	process.mainModule.filename = extRoot + Path.sep +'.';
-	process.mainModule.paths = module.constructor._nodeModulePaths(extRoot + Path.sep +'.');
+	process.mainModule.paths = module.constructor._nodeModulePaths(process.mainModule.filename);
 	process.mainModule.exports = null;
 	process.mainModule.children.splice(0, Infinity);
 	process.chdir(extDir);

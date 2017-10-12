@@ -17,7 +17,7 @@
 		"eslintrc": "NiklasGollenstede/eslintrc",
 		"extract-zip": "1.6.5",
 		"ffi": "2.2.0",
-		"multiport": "0.2.1",
+		"multiport": "0.2.2",
 		"pkg": "4.2.3",
 		"ref-array": "^1.2.0",
 		"ref-struct": "^1.1.0",

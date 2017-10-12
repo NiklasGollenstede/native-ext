@@ -1,11 +1,12 @@
-'use strict'; module.exports = version => { const browser = { };
+'use strict'; module.exports = async ({ version, port, }) => { const browser = { };
 
 /**
  * This module collects and exposes information about the connecting browser and extension.
  * It is available as 'browser' for the extension modules.
  */
 
-const FS = require('fs'), Path = require('path');
+const FS = require('fs'), Path = require('path'), { promisify, } = require('util');
+const realpath = promisify(FS.realpath);
 
 void version; // nothing version specific so far
 
@@ -65,20 +66,49 @@ function getBrowserPid() { switch (process.platform) {
 	switch (browser.name) {
 		case 'chromium': case 'chrome': {
 			const extId = browser.extId = (/^chrome-extension:\/\/(.*)\/?$/).exec(process.argv[4])[1];
-			const pid = browser.pid;
-			console.info({ extId, pid, }, getBrowserArgs());
-			throw new Error(`Not implemented`);
-			// defaults: https://chromium.googlesource.com/chromium/src/+/master/docs/user_data_dir.md
-			// besides `--user-data-dir=./test_dir` the cli
-			// can contain `--user-data-dir=".\test dir"` or `"--user-data-dir=.\test dir"` on windows
-			// and (probably) also `--user-data-dir=./test\ dir` on mac/linux
-		}
+			const { cwd, args, } = getBrowserArgs();
+			console.info({ cwd, args, });
+			const arg = args.find(arg => (/^"?--user-data-dir=/).test(arg)); // TODO: does /user-data-dir= work as well (on windows?)
+			let cdd = arg && arg.replace(/^--user-data-dir=/, '').replace(/"/g, '').replace(/\\ /g, ' ');
+			if (cdd && !Path.isAbsolute(cdd)) { throw new Error(`Chrome was started with the --user-data-dir argument, but the path (${cdd}) was not absolute. To use NativeExt, please supply an absolute path!`); }
+			if (!cdd) { switch (process.platform) { // use default, currently ignores Chrome Beta/Dev/Canary
+				case 'win32': {
+					cdd = Path.join(process.env.LOCALAPPDATA, String.raw`Google\Chrome\User Data`);
+				} break;
+				case 'linux': {
+					if (process.env.CHROME_USER_DATA_DIR) { return Path.resolve(process.env.CHROME_USER_DATA_DIR); }
+					const config = (process.env.CHROME_CONFIG_HOME || process.env.XDG_CONFIG_HOME || '~/.config').replace(/^~(?=[\\\/])/, () => require('os').homedir());
+					cdd = Path.join(config, browser.name === 'chromium' ? 'chromium' : 'google-chrome');
+				} break;
+				case 'darwin': {
+					cdd = Path.join(require('os').homedir(), 'Library/Application Support', browser.name === 'chromium' ? 'Chromium' : 'Google/Chrome');
+				} break;
+				default: throw new Error(`Unknown OS ${ process.platform }`);
+			} }
+			try { FS.statSync(cdd); } catch (error) { throw new Error(`Failed to locate the chrome data dir, deducted "${cdd}" but that doesn't exist`); }
+
+			try { browser.extDir = FS.realpathSync(Path.join(cdd, 'Default', 'Extensions', extId)); browser.profileDir = Path.join(cdd, 'Default'); }
+			catch (error) { // the extension is not installed in the default profile.
+				// This can have two causes: (1) the extension is installed as a temporary extension; (2) the current profile is not 'Default'
+				// The former should only happen to developers (who should have read the docs), so this only handles the second case:
+				const profile = (await port.request('init.getChromeProfileDirName'));
+				try { FS.accessSync(Path.join(cdd, profile)); } catch (error) { throw new Error(`The Profile "${profile}" does not exist in "${cdd}"`); }
+				try { browser.extDir = FS.realpathSync(Path.join(cdd, profile, 'Extensions', extId)); browser.profileDir = Path.join(cdd, profile); }
+				catch (error) { throw new Error(`The extension ${extId} is not installed in ${ Path.join(cdd, profile) }. (Read the docs for unpacked extensions)`); }
+			}
+		} break;
 		case 'firefox': {
 			const extId = browser.extId = process.argv[5];
 			if (process.env.MOZ_CRASHREPORTER_EVENTS_DIRECTORY) {
-				const extPath = FS.realpathSync(Path.resolve(process.env.MOZ_CRASHREPORTER_EVENTS_DIRECTORY, '../../extensions', extId +'.xpi'));
-				let stat; try { stat = FS.statSync(extPath); } catch (error) { throw new Error(`Can't access extension at ${ extPath }`); }
-				browser[stat.isDirectory() ? 'extDir' : 'extFile'] = extPath;
+				browser.profileDir = Path.resolve(process.env.MOZ_CRASHREPORTER_EVENTS_DIRECTORY, '../..');
+				const extPath = Path.join(browser.profileDir, 'extensions', extId);
+				const [ extDir, extFile, ] = (await Promise.all([
+					realpath(extPath).catch(() => null),
+					realpath(extPath +'.xpi').catch(() => null),
+				]));
+				if (extDir && FS.statSync(extDir).isDirectory()) { browser.extDir = extDir; }
+				else if (extFile && FS.statSync(extFile).isFile()) { browser.extFile = extFile; }
+				else { throw new Error(`Can't locate extension at ${ extPath }(.xpi)`); }
 			} else {
 				throw new Error(`MOZ_CRASHREPORTER_EVENTS_DIRECTORY environment variable not set by Firefox`);
 				// const args = getBrowserArgs();

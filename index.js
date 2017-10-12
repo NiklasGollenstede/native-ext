@@ -1,14 +1,14 @@
 /* eslint-disable strict */ (function(global) { 'use strict'; define(async ({ /* global define, */ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
-	'node_modules/web-ext-utils/browser/': { runtime, rootUrl, },
+	'node_modules/web-ext-utils/browser/': { runtime, rootUrl, manifest, Storage: { local: Storage, }, },
 	'node_modules/web-ext-utils/lib/multiport/': Port,
 	'node_modules/web-ext-utils/utils/event': { setEvent, },
-	exports,
-}) => {
+}) => { const Native = { };
 
-let channel = null; const refs = new WeakMap, cache = { __proto__: null, };
+let channel = null; const refs = new Map, cache = { __proto__: null, };
 
-const fireError  = setEvent(exports, 'onUncaughtException', { lazy: false, });
-const fireReject = setEvent(exports, 'onUnhandledRejection', { lazy: false, });
+Object.defineProperty(Native, 'options', { value: { __proto__: null, }, enumerable: true, });
+const fireError  = setEvent(Native, 'onUncaughtException', { lazy: false, });
+const fireReject = setEvent(Native, 'onUnhandledRejection', { lazy: false, });
 
 function connect() {
 	if (channel) { return channel.port; }
@@ -22,7 +22,7 @@ function connect() {
 	}); port.ended.then(disconnect);
 
 	// setup
-	port.addHandlers('init.', { }); // for future requests
+	port.addHandlers('init.', initHandlers);
 	port.inited = port.request('init', { versions: [ '0.2', ], }).then(version => (port.version = version));
 
 	// handle messages
@@ -38,7 +38,7 @@ function connect() {
 
 function disconnect() {
 	if (!channel) { return; } const { port, } = channel, { error, } = port; channel = null; port.destroy();
-	refs.forEach(obj => { try { refs.delete(obj); obj.doClose(); obj.onDisconnect && obj.onDisconnect(error); } catch (error) { console.error(error); } });
+	refs.forEach(obj => { if (obj) { try { obj.doClose(); obj.onDisconnect && obj.onDisconnect(error); } catch (error) { console.error(error); } } }); refs.clear();
 	Object.keys(cache).forEach(key => delete cache[key]);
 }
 
@@ -86,7 +86,22 @@ function unref(ref) {
 	return true;
 }
 
-Object.assign(exports, {
+const initHandlers = {
+	async getChromeProfileDirName() {
+		if (typeof Native.options.getChromeProfileDirName === 'function') { return Native.options.getChromeProfileDirName(); }
+		const key = '__native-ext__.chromeProfileDirName';
+		const { [key]: stored, } = (await Storage.get(key)); if (stored) { return stored; }
+		const maybe = global.prompt( // prompt doesn't really work for this because it blocks the browser
+			`To communicate with your OS to enable some advanced features, ${manifest.name} needs to know the name of your Chrome profile directory.
+			Please paste the path left of "Profile Path" on "chrome://version/" below:`.replace(/^\s+/gm, ''),
+			'',
+		).replace(/^.*[\\\/]/, '');
+		channel.port.inited.then(() => { console.log('saving profile'); Storage.set({ [key]: maybe, }); }); // save if connection succeeds
+		return maybe;
+	},
+};
+
+return Object.assign(Native, {
 	require, unref, nuke: disconnect,
 	get version() { return channel && channel.port.version; },
 });

@@ -134,6 +134,7 @@ NativeExt can automatically update its manifest, but the ids of the allowed exte
 ```
 The name of your file should be your extensions name/id/domain or that of its developing organization and should probably not contain spaces.
 
+
 ### Building
 
 Building NativeExt requires node.js v8+ and npm. After cloning or downloading the sources, install the dependencies with:

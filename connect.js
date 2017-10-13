@@ -33,6 +33,10 @@ const Port = require('./node_modules/multiport/index.js'), port = new Port(
 	Object.defineProperty(process, 'stdout', { value: stdout, });
 	Object.defineProperty(process, 'stderr', { value: stderr, });
 
+	if (process.argv[1].startsWith(Path.resolve('/snapshot/'))) { // for some weird reason, in pkg packed apps, the console writes directly to fd 1 and 2
+		Object.defineProperty(global, 'console', { value: new (require('console').Console)(stdout, stderr), });
+	}
+
 	process.on('uncaughtException', async error => !(await port.request('error', error)) && process.exit(1));
 	process.on('unhandledRejection', async error => !(await port.request('reject', error)) && process.exit(1));
 }
@@ -75,7 +79,7 @@ const modules = { __proto__: null, }; let originalRequireResolve; { // extend re
 
 	function makeLazyLoader(name, precond) { return () => {
 		precond && precond();
-		if (!bindingsModule) { require(bindingsPath); bindingsModule = require.cache[bindingsPath]; }
+		if (!bindingsModule) { module.require(bindingsPath); bindingsModule = require.cache[bindingsPath]; }
 		const bindingsExports = bindingsModule.exports;
 		const nodePath = Path.join(cwd, `res/${name}.node`);
 		bindingsModule.exports = () => module.require(nodePath);
@@ -92,7 +96,7 @@ const modules = { __proto__: null, }; let originalRequireResolve; { // extend re
 		let exports, currentCwd; try {
 			currentCwd = process.cwd(); process.chdir(cwd);
 			const fullPath = originalRequireResolve(id, module);
-			exports = require(fullPath);
+			exports = module.require(fullPath);
 			(function clear(module) {
 				delete require.cache[module.filename] && module.children.forEach(clear);
 			})(require.cache[fullPath]);

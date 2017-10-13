@@ -29,13 +29,13 @@ To completely uninstall NativeExt, run the `uninstall.sh` script in the installa
 This package tries to solve a problem that arises with the deprecation of classical Add-Ons in Firefox.\
 From Firefox version 57 onward (November 2017), Firefox will only support "WebExtensions", which are very similar to the extensions running in Chrome, other Chromium based browsers and even Microsoft Edge.\
 While Firefox Add-ons could previously dig very deep into the Firefox code, capable of changing nearly every aspect of the browser, and even do binary system calls, this is no longer possible with WebExtensions. They can only access normal web APIs (XHR, IndexedDB, ...) and a set of APIs in the `browser`/`chrome` namespace explicitly  designed for them. This means that browser extensions can now only do things that are, at least to a certain extend, intended by the browser vendors. Many innovative things that could previously be implemented in Firefox Add-Ons are no longer possible.\
-The only way around this is to use "Native Messaging": WebExtensions in Chrome and Firefox can send JSON-messages to native applications running on the host system — if the target applications are explicitly designed for it.
+The only way (partially) around this is to use "Native Messaging": WebExtensions in Chrome and Firefox can send JSON-messages to native applications running on the host system — if the target applications are explicitly designed for it.
 
 ### The Problem
 
 The problem with the Native Messaging approach is twofold. Where it was previously enough to develop and install a single JavaSceipt extension for a browser,
-- the developer now needs to write, pack and update an application for multiple operating systems
-- and the user needs to install and update that additional application for every extension that makes use of Native Messaging.
+- the developer now needs to write, pack and update an application for multiple operating systems and
+- the user needs to install and update that additional application for every extension that makes use of Native Messaging.
 
 ### Proposed solution
 
@@ -43,73 +43,71 @@ It seems that there is no way around Native Messaging. If you want to implement 
 Therefore, both developing and installing and updating the native applications needs to be as easy as possible, to lower the barrier to entry for developers and users.\
 This software aims to do that. Once everything is implemented as intended, the development - deploy - update cycle should be as follows:
 
-- The developer writes a node.js script
-	- the script is written in same language as the extension itself
+- The developer can include node.js modules in the extension package
+	- the script modules are written in same language as the rest of the extension
 - The user installs this free and open software with as few clicks as possible
 	- this only needs to be done once
 	- since this software has no own functionality and the protocol is simple, no updates should be necessary (once the API is finalized)
 - The extension prompts the user to download and run a very short and simple script that registers the extension with this software
-	- the script places a file with its extension IDs and a signing key in a predefined directory and calls a refresh script
-	- writing the IDs is technically necessary and the signing is a security precaution
-	- scripts are so generic that they can be generated automatically, users who don't trust the scripts can perform their actions manually in about 30 seconds
+	- the script places a file with its extension IDs in a predefined directory and calls a refresh script (writing the IDs is technically necessary)
+	- scripts are so generic that they can be generated automatically, users who don't trust the scripts can perform their actions manually in about 30 seconds, see [Installation](#installation)
 - The extension can now contact this software without further user interaction
-	- it sends a signed node.js script that is executed and can respond to further messages
-	- to update the "native application", it is enough to include a new signed script in the extension
+	- NativeExt locates the extension installation and makes the included node.js modules available to be executed it's slightly modified node.js process
+	- to update the "native application", it is enough to update the extension with new node.js modules
 	- this way, the versions of the extension and the native application always match
 
 ### Implementation status
 
-Building, installation and connecting from Chrome and Firefox works on Windows, Linux and macOS.\
-The API for the connection establishment is neither finalized nor documented.\
-Signing is not implemented at all.
+Building, installation and connecting from Firefox works on Windows, Linux and macOS, from Chrome currently only Windows.\
+The API for the connection establishment and the modifications of the node.js environment are not finalized.
 
-### API
+
+### [API](./api/README.md)
+
+
+### Example
 
 The API is not finalized and may be subject to breaking changes.
 One part that is unlikely to change is the usage of [Multiport](https://github.com/NiklasGollenstede/multiport) for the communication.
 
 ```js
-const connect = require('node_modules/web-ext-utils/loader/native');
+const Native = await require.async('node_modules/native-ext/');
 
-const port = (await connect({ // returns a multiport/Port, see above
-	script: (await (await fetch('./native.js')).text()),
-	sourceURL: require.toUrl('./native.js'), // optional, for stack traces
-	// the browser implicitly sends the extensions ID
-	// signature: // TBD
-}));
+const fs = (await Native.require(require.resolve('./fs.node.js')));
 
-// the async main function of ./native.js has returned
+const file = (await fs.readFile(somePath, 'utf8'));
 
-const file = (await port.request('fs.readFile', somePath, 'utf8'));
+fs.watch(someOtherPath, { }, onChange); // can even send callbacks
 
-port.post('fs.watch', somePath, { }, onChange); // can even send callbacks
-port.afterEnded('fs.unwatch', onChange); // remove listener after the connection closed
+later(() => fs.unwatch(onChange)); // remove listener after the connection closed
 
 function onChange(type, name) {
 	console.log('File', name, type +'d');
 }
 ```
-`./native.js`:
+`./fs.node.js`:
 ```js
-async port => {
-	const { promisify, } = require('util'), promisifyAll = ...; // work with promises
+'use strict'; /* global require, module, exports, process, Buffer, */
 
-	const fs = promisifyAll(require('fs')); // any native module
+const { promisify, } = require('util'), promisifyAll = ...; // work with promises
 
-	port.addHandlers('fs.', fs); // expose the fs module under the 'fs.' prefix
+const fs = promisifyAll(require('fs')); // any native module, 'ffi', 'browser' or any file included in the extension
 
-	// handle special case of `fs.watch`
-	const cb2watcher = new WeakSet;
-	port.removeHandler('fs.watch').addHandler('fs.watch', (path, options, callback) => {
-		const watcher = fs.watch(path, options, callback);
-		ch2watcher.set(callback, watcher);
-	}).addHandler('fs.unwatch', callback => {
-		const watcher = ch2watcher.get(callback);
-		watcher && watcher.close();
-		ch2watcher.delete(callback);
-	});
+port.addHandlers('fs.', fs); // expose the fs module under the 'fs.' prefix
+
+// handle special case of `fs.watch`
+const cb2watcher = new WeakSet, { watch, } = fs;
+fs.watch = (path, options, callback) => {
+	const watcher = watch(path, options, callback);
+	ch2watcher.set(callback, watcher);
+};
+fs.unwatch = callback => {
+	const watcher = ch2watcher.get(callback);
+	watcher && watcher.close();
+	ch2watcher.delete(callback);
 }
 
+module.exports = fs;
 ```
 
 ### Registration files

@@ -91,12 +91,13 @@ const initHandlers = {
 		if (typeof Native.options.getChromeProfileDirName === 'function') { return Native.options.getChromeProfileDirName(); }
 		const key = '__native-ext__.chromeProfileDirName';
 		const { [key]: stored, } = (await Storage.get(key)); if (stored) { return stored; }
-		const maybe = global.prompt( // prompt doesn't really work for this because it blocks the browser
+		let maybe = global.prompt( // prompt doesn't really work for this because it blocks the browser
 			`To communicate with your OS to enable some advanced features, ${manifest.name} needs to know the name of your Chrome profile directory.
 			Please paste the path left of "Profile Path" on "chrome://version/" below:`.replace(/^\s+/gm, ''),
 			'',
-		).replace(/^.*[\\\/]/, '');
-		channel.port.inited.then(() => { console.log('saving profile'); Storage.set({ [key]: maybe, }); }); // save if connection succeeds
+		);
+		maybe && (maybe = maybe.replace(/^.*[\\\/]/, ''));
+		maybe && channel.port.inited.then(() => { console.log('saving profile'); Storage.set({ [key]: maybe, }); }); // save if connection succeeds
 		return maybe;
 	},
 };

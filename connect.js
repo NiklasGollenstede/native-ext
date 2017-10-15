@@ -33,7 +33,7 @@ const Port = require('./node_modules/multiport/index.js'), port = new Port(
 	Object.defineProperty(process, 'stdout', { value: stdout, });
 	Object.defineProperty(process, 'stderr', { value: stderr, });
 
-	if (process.argv[1].startsWith(Path.resolve('/snapshot/'))) { // for some weird reason, in pkg packed apps, the console writes directly to fd 1 and 2
+	if (process.platform !== 'win32' || process.argv[1].startsWith(Path.resolve('/snapshot/'))) { // in pkg packed apps and linux the console writes directly to fd 1 and 2 (or the original stdout/stderr)
 		Object.defineProperty(global, 'console', { value: new (require('console').Console)(stdout, stderr), });
 	}
 

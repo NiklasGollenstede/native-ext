@@ -52,8 +52,10 @@ async function install({ source, }) {
 
 	(await Promise.all([
 		node ? symlink(source, binTarget, 'junction') : copyFile(binTarget, source).then(() => chmod(binTarget, '754')),
-		replaceFile(outPath('chrome.json'),  JSON.stringify(manifest('chrome'), null, '\t'), 'utf8'),
-		replaceFile(outPath('firefox.json'), JSON.stringify(manifest('firefox'), null, '\t'), 'utf8'),
+		!windows &&
+		replaceFile(outPath('chromium.json'), JSON.stringify(manifest('chromium'), null, '\t'), 'utf8'),
+		replaceFile(outPath('chrome.json'),   JSON.stringify(manifest('chrome'),   null, '\t'), 'utf8'),
+		replaceFile(outPath('firefox.json'),  JSON.stringify(manifest('firefox'),  null, '\t'), 'utf8'),
 		mkdir(outPath('vendors')).catch(_=>0),
 		...(windows ? [
 			execute('REG', 'ADD', 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\'+ name, '/ve', '/t', 'REG_SZ', '/d', outPath('chrome.json'),  '/f'),
@@ -78,7 +80,7 @@ async function install({ source, }) {
 		.then(() => mkdir(outPath(`../.config/chromium`)).catch(_=>0))
 		.then(() => mkdir(outPath(`../.config/chromium/NativeMessagingHosts`)).catch(_=>0))
 		.then(() =>unlink(outPath(`../.config/chromium/NativeMessagingHosts/${ name }.json`)).catch(_=>0))
-		.then(() => symlink(outPath(`chrome.json`), outPath(`../.config/chromium/NativeMessagingHosts/${ name }.json`))),
+		.then(() => symlink(outPath(`chromium.json`), outPath(`../.config/chromium/NativeMessagingHosts/${ name }.json`))),
 		/*chrome*/  mkdir(outPath(`../.config/`)).catch(_=>0)
 		.then(() => mkdir(outPath(`../.config/google-chrome`)).catch(_=>0))
 		.then(() => mkdir(outPath(`../.config/google-chrome/NativeMessagingHosts`)).catch(_=>0))
@@ -94,7 +96,7 @@ async function install({ source, }) {
 		/*chromium*/mkdir(outPath(`../Chromium`)).catch(_=>0)
 		.then(() => mkdir(outPath(`../Chromium/NativeMessagingHosts`)).catch(_=>0))
 		.then(() =>unlink(outPath(`../Chromium/NativeMessagingHosts/${ name }.json`)).catch(_=>0))
-		.then(() => symlink(outPath('chrome.json'), outPath(`../Chromium/NativeMessagingHosts/${ name }.json`))),
+		.then(() => symlink(outPath('chromium.json'), outPath(`../Chromium/NativeMessagingHosts/${ name }.json`))),
 		/*chrome*/  mkdir(outPath(`../Google`)).catch(_=>0)
 		.then(() => mkdir(outPath(`../Google/Chrome`)).catch(_=>0))
 		.then(() => mkdir(outPath(`../Google/Chrome/NativeMessagingHosts`)).catch(_=>0))
@@ -121,6 +123,10 @@ async function refresh() {
 	));
 
 	(await Promise.all([
+		!windows &&
+		replaceFile(outPath('chromium.json'),  JSON.stringify(
+			Object.assign(JSON.parse((await readFile(outPath('chromium.json')))), { allowed_origins: urls, }),
+		null, '\t'), 'utf8'),
 		replaceFile(outPath('chrome.json'),  JSON.stringify(
 			Object.assign(JSON.parse((await readFile(outPath('chrome.json')))), { allowed_origins: urls, }),
 		null, '\t'), 'utf8'),

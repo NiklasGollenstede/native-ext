@@ -73,9 +73,9 @@ One part that is unlikely to change is the usage of [Multiport](https://github.c
 ```js
 const Native = await require.async('node_modules/native-ext/');
 
-const fs = (await Native.require(require.resolve('./fs.node.js')));
+const fs = await Native.require(require.resolve('./fs.node.js'));
 
-const file = (await fs.readFile(somePath, 'utf8'));
+const file = await fs.readFile(somePath, 'utf8');
 
 fs.watch(someOtherPath, { }, onChange); // can even send callbacks
 
@@ -135,11 +135,11 @@ The name of your file should be your extensions name/id/domain or that of its de
 
 ### Building
 
-Building NativeExt requires node.js v8+ and npm. After cloning or downloading the sources, install the dependencies with:
+Building NativeExt requires node.js in the exact version listed in the `package.json`/`"scripts"`.`"build"` command (currently 8.3), npm and [node-gyp](https://github.com/nodejs/node-gyp#installation) including its dependencies. After cloning or downloading the sources, install the dependencies with:
 
 `npm install`
 
-Now you can either install directly from the sources (this creates symlinks, so keep the sources and node.js v8+):
+Now you can either install directly from the sources (this creates symlinks, so keep the sources and node.js of the correct version):
 
 `node install`
 
@@ -149,6 +149,6 @@ build only for your current system:
 
 or for all supported platforms:
 
-`npm run build-all`
+`npm run build-all` (these will not work with Chrome or extensions that rely on `ffi`, which needs to be build explicitly for each platform)
 
 The builds will be placed in the `/release` folder.

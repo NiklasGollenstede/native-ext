@@ -3,7 +3,7 @@
 	Tar,
 }) => {
 
-const chromeUrl = !gecko ? rootUrl : manifest.applications && manifest.applications.chrome && manifest.applications.chrome.id && `chrome-extension://${manifest.applications.chrome.id}/` || undefined;
+const chromeUrl = !gecko ? rootUrl : /*manifest.applications && manifest.applications.chrome && manifest.applications.chrome.id && `chrome-extension://${manifest.applications.chrome.id}/` ||*/ undefined;
 const firefoxId = gecko ? runtime.id : manifest.applications && manifest.applications.gecko && manifest.applications.gecko.id || undefined;
 const json = JSON.stringify({ 'firefox-ext-ids': firefoxId && [ firefoxId, ], 'chrome-ext-urls': chromeUrl && [ chromeUrl, ], });
 const windows = (/windows/i).test(global.navigator.userAgent), macos = !windows && (/mac\s*os\s*x/i).test(global.navigator.userAgent);

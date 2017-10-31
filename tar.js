@@ -35,7 +35,7 @@ return class Tar {
 			// leave the rest blank
 
 			pos = 100 + 3*8 + 2*12; // seek to checksum
-			write(  8, header.reduce((a, b) => a + b) +' \0'); // checksum
+			write(  8, header.reduce((a, b) => a + b).toString(8).padStart(6, '0') +' \0'); // checksum
 		}
 
 		this._buffers.push(header, data, Tar.alloc((512 - data.length % 512) % 512));

@@ -9,7 +9,7 @@ const FS = Object.assign({ }, require('fs')), Path = require('path'), _package =
 
 // set up communication
 const Port = require('./node_modules/multiport/index.js'), port = new Port(
-	new (require('./runtime-port.js'))(process.stdin, process.stdout),
+	new (require('./runtime-port.js'))(process.stdin.on.bind(process.stdin, 'data'), process.stdout.write.bind(process.stdout)),
 	Port.web_ext_Port,
 );
 
@@ -30,12 +30,15 @@ const Port = require('./node_modules/multiport/index.js'), port = new Port(
 		}, decodeStrings: false, });
 	}
 	const stdout = stream('stdout'), stderr = stream('stderr');
-	Object.defineProperty(process, 'stdout', { value: stdout, });
-	Object.defineProperty(process, 'stderr', { value: stderr, });
 
-	if (process.platform !== 'win32' || process.argv[1].startsWith(Path.resolve('/snapshot/'))) { // in pkg packed apps and linux the console writes directly to fd 1 and 2 (or the original stdout/stderr)
-		Object.defineProperty(global, 'console', { value: new (require('console').Console)(stdout, stderr), });
-	}
+	// When the process is being `--inspect`ed, the functions of the global console are overwritten
+	// and the arguments logged to the inspector before they are passed on tho the original global console.
+	// Replacing the global console object would thus break the logging in the inspector.
+	// The original console calls the public `.write()` methods on the original process.stdout/err streams,
+	// so replacing those methods with the ones from the new streams prevents the console from actually writing to fd 1 or 2.
+	// This should also help with all other (js) modules which already grabbed the original process.stdout/err.
+	process.stdout.write = stdout.write.bind(stdout); Object.defineProperty(process, 'stdout', { value: stdout, });
+	process.stderr.write = stderr.write.bind(stderr); Object.defineProperty(process, 'stderr', { value: stderr, });
 
 	process.on('uncaughtException', async error => !(await port.request('error', error)) && process.exit(1));
 	process.on('unhandledRejection', async error => !(await port.request('reject', error)) && process.exit(1));

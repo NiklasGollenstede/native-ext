@@ -1,37 +1,31 @@
 'use strict'; /* global Buffer, */
 
 /**
- * Transforms the stdio streams of a node.js native messaging app into something resembling a browser.runtime.Port.
- * @param  {stream.Readable}  stdin
- * @param  {stream.Writable}  stdout
- * @return {object}                   Object of { postMessage, onMessage, onDisconnect, }.
+ * Transforms the .on('data') and .write() methods of the stdio streams of a node.js native messaging app
+ * into something resembling a browser.runtime.Port (which never fires onDisconnect).
+ * Buffers incoming messages without limit and does not check the outgoing message sizes.
+ * Sending messages that are to large will cause the browser to disconnect.
+ * @param  {function}  onData  stdin.on.bind(stdin, 'data')
+ * @param  {function}  write   stdout.write.bind(stdout)
+ * @return {object}            Object of { postMessage, onMessage, onDisconnect, }.
  */
-module.exports = function runtimePort(stdin, stdout) {
-	const onMessage = new Set, onDisconnect = new Set;
-	const empty = Buffer.alloc(0);
+module.exports = function runtimePort(onData, write) {
+	const onMessage = new Set, empty = Buffer.alloc(0);
 
-	let expect = null, buffer = empty;
-	stdin.on('data', data => {
-		// console.log('data', data.length);
-		buffer = buffer === empty ? data : Buffer.concat([ buffer, data, ]);
+	let expect = null, buffer = empty; onData(function onData(data) {
+		data !== empty && (buffer = buffer === empty ? data : Buffer.concat([ buffer, data, ]));
 		if (expect == null) {
 			if (buffer.length < 4) { return; }
-			expect = buffer.readInt32LE(0);
+			expect = buffer.readInt32LE(0); // might want to exit if expect <= 0
 			buffer = buffer.length === 4 ? empty : buffer.slice(4);
-			// console.log('expect', expect);
 		}
-		if (buffer.length >= expect) {
-			const message = JSON.parse(buffer.toString('utf8', 0, expect));
-			buffer = buffer.length === expect ? empty : Buffer.from(buffer.slice(expect));
-			expect = null;
-			// console.log('message', message);
-			emit(onMessage, message);
-		}
+		if (buffer.length < expect) { return; }
+		const message = JSON.parse(buffer.toString('utf8', 0, expect));
+		buffer = buffer.length === expect ? empty : Buffer.from(buffer.slice(expect));
+		expect = null;
+		onMessage.forEach(func => { try { func(message); } catch (error) { console.error('Error in Port event', error); } });
+		onData(empty); // may have another message in buffer
 	});
-
-	function emit(event, data) {
-		event.forEach(func => { try { func(data); } catch (error) { console.error('Error in Port event', error); } });
-	}
 
 	function postMessage(message) {
 		// console.log('reply', message);
@@ -40,7 +34,7 @@ module.exports = function runtimePort(stdin, stdout) {
 		const buffer = Buffer.allocUnsafe(4 + length);
 		buffer.writeInt32LE(length);
 		buffer.write(string, 4, length, 'utf8');
-		stdout.write(buffer);
+		write(buffer);
 	}
 
 	return {
@@ -49,9 +43,6 @@ module.exports = function runtimePort(stdin, stdout) {
 			addListener: onMessage.add.bind(onMessage),
 			removeListener: onMessage.delete.bind(onMessage),
 		},
-		onDisconnect: {
-			addListener: onDisconnect.add.bind(onDisconnect),
-			removeListener: onDisconnect.delete.bind(onDisconnect),
-		},
+		onDisconnect: { addListener() { }, removeListener() { }, },
 	};
 };

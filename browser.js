@@ -57,11 +57,14 @@ function getBrowserPid() { switch (process.platform) {
 		return ppid(ppid(process.pid));
 	}
 	case 'linux': {
-		// const LibC = require('ffi').Library('libc', { getppid: [ 'long', [ ], ], });
 		function ppid(pid) { return FS.readFileSync(`/proc/${pid}/stat`, 'utf-8').match(/^\d+ \(.*?\) \w+? (\d+)/)[1] -0; }
 		return ppid(ppid(process.pid));
 	};
-	case 'darwin': throw new Error(`Not implemented`);
+	case 'darwin': {
+		const exec = require('child_process').execFileSync;
+		function ppid(pid) { return +(/\d+/).exec(exec('ps', [ '-p', pid+'', '-o', 'ppid', ]))[0]; } // this will be slow
+		return ppid(require('ffi').Library('libc', { getppid: [ 'long', [ ], ], }).getppid());
+	};
 	default: throw new Error(`Unknown OS ${process.platform}`);
 } }
 
@@ -114,7 +117,6 @@ function getBrowserPid() { switch (process.platform) {
 				realpath(extPath +'/manifest.json').catch(() => null),
 				readdir(extPath).catch(() => null),
 			]));
-			console.log(extLink, extManifest, extList);
 			if (extLink) { try {
 				const extDir = normalizeTextPath(extLink);
 				if (FS.statSync(extDir).isDirectory()) { browser.extDir = extDir; break; }
@@ -168,8 +170,13 @@ function getBrowserPid() { switch (process.platform) {
 				const command = FS.readFileSync(`/proc/${browser.pid}/cmdline`, 'utf-8').replace(/\0$/, '');
 				const args = [ ]; command.replace(/".*?"|(?:[^\s\\]|\\ |\\)+(?:".*?")?/g, s => (args.push(s), ''));
 				return { cwd, args, };
-			};
-			case 'darwin': throw new Error(`Not implemented`);
+			}
+			case 'darwin': {
+				// see stackoverflow.com/q/8327139 for cwd and possibly a ffi solution 
+				const command = exec('ps', [ '-p', browser.pid+'', '-o', 'command', ], { encoding: 'utf-8', }).split(/\n/g)[1];
+				const args = [ ]; command.replace(/".*?"|(?:[^\s\\]|\\ |\\)+(?:".*?")?/g, s => (args.push(s), ''));
+				return { cwd: null, args, };
+			}
 			default: throw new Error(`Unknown OS ${process.platform}`);
 		}
 	}

@@ -4,6 +4,10 @@
  * This module is run once on startup and prepares the process to run the node.js modules provided by the connecting extension.
  */
 
+// Not sure who messed this up, but the path to the manifest file passed by firefox is split into two args on macos. This is an ugly workaround
+process.platform === 'darwin' && process.argv[3] === 'firefox' && process.argv[4] === '/Users/user/Library/Application' && process.argv.splice(4, 2, process.argv[4] +' '+ process.argv[5]);
+
+
 const FS = Object.assign({ }, require('fs')), Path = require('path'), _package = module.require(Path.join(__dirname, 'package.json'));
 
 

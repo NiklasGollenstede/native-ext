@@ -14,8 +14,8 @@ Alternatively, you can [build NativeExt](#building) yourself.
 3. **Extension registration**: For the browsers to allow the communication between your extensions and NativeExt, the extensions need to be registered. If the extension in question provided you with an registration script, run that and you are done.\
 *Otherwise*:
 	- a) Open the installation directory, which is `%APPDATA%\de.niklasg.native_ext` on Windows, `~/.de.niklasg.native_ext` on Linux and `~/Library/Application Support/de.niklasg.native_ext` on macOS.
-	- b) Create a file in the `/vendors/` subdir as described in the [registration files](#registration-files) section below.
-	- c) Run the `refresh.bat`/`refresh.sh` file in the installation root.
+	- b) Create a file in the `vendors/` subdir as described in the [registration files](#registration-files) section below.
+	- c) Run the `refresh.bat`/`refresh.sh` file in the installation directory.
 
 ### Uninstallation
 
@@ -58,7 +58,7 @@ This software aims to do that. Once everything is implemented as intended, the d
 
 ### Implementation status
 
-Building, installation and connecting from Firefox works on Windows, Linux and macOS, from Chrome currently only Windows.\
+Building, installation and connecting from Chrome and Firefox works on Windows, Linux and macOS.\
 The API for the connection establishment and the modifications of the node.js environment are not finalized.
 
 
@@ -120,13 +120,12 @@ NativeExt can automatically update its manifest, but the ids of the allowed exte
 	"chrome-ext-urls": [
 		// these ids are only constant for extensions hosted in the chrome store
 		// otherwise, they are different for every (development mode) installation of the extension
-		"chrome-extension://bifnmhkpejedfmdgiigmomljbieidegk/"
+		"chrome-extension://abcdefghijklmnopabcdefghijklmnop/"
 	],
 	// list of Firefox WebExtension application ids, they always contain an @ symbol
 	"firefox-ext-ids": [
-		"@re-style" // you must set this in the "applications" entry in your extensions manifest.json
-	],
-	"key": "..." // TBD, see Implementation status
+		"@extension-id" // you must set this in the "applications" entry in your extensions manifest.json
+	]
 }
 
 ```

@@ -8,7 +8,9 @@
 process.platform === 'darwin' && process.argv[3] === 'firefox' && process.argv[4] === '/Users/user/Library/Application' && process.argv.splice(4, 2, process.argv[4] +' '+ process.argv[5]);
 
 
-const FS = Object.assign({ }, require('fs')), Path = require('path'), _package = module.require(Path.join(__dirname, 'package.json'));
+const FS = Object.assign({ }, require('fs')), Path = require('path');
+const _package = module.require(Path.join(__dirname, 'package.json'));
+const Module = require('module');
 
 
 // set up communication
@@ -57,7 +59,7 @@ let protocol; { // protocol negotiation
 
 
 const modules = { __proto__: null, }; let originalRequireResolve; { // extend require
-	const Module = require('module'), { _resolveFilename, _load, } = Module;
+	const { _resolveFilename, _load, } = Module;
 	originalRequireResolve = _resolveFilename;
 	Module._resolveFilename = function(path) {
 		if (path in modules) { return path; }
@@ -89,25 +91,24 @@ const modules = { __proto__: null, }; let originalRequireResolve; { // extend re
 		if (!bindingsModule) { module.require(bindingsPath); bindingsModule = require.cache[bindingsPath]; }
 		const bindingsExports = bindingsModule.exports;
 		const nodePath = Path.join(cwd, `res/${name}.node`);
-		bindingsModule.exports = () => module.require(nodePath);
+		Module._cache = Object.create(Module._cache);
 		let exports; try {
+			bindingsModule.exports = () => module.require(nodePath);
 			exports = requireClean(name);
 		} finally {
+			Module._cache = Object.getPrototypeOf(Module._cache);
 			bindingsModule.exports = bindingsExports;
-			delete require.cache[nodePath];
-			delete require.cache[bindingsPath];
 		} return exports;
 	}; }
 
 	function requireClean(id) { // use local require and original cwd, restore and cleanup afterwards
-		let exports, currentCwd; try {
-			currentCwd = process.cwd(); process.chdir(cwd);
-			const fullPath = originalRequireResolve(id, module);
-			exports = module.require(fullPath);
-			(function clear(module) {
-				delete require.cache[module.filename] && module.children.forEach(clear);
-			})(require.cache[fullPath]);
+		const currentCwd = process.cwd();
+		Module._cache = Object.create(Module._cache);
+		let exports; try {
+			process.chdir(cwd);
+			exports = module.require(originalRequireResolve(id, module));
 		} finally {
+			Module._cache = Object.getPrototypeOf(Module._cache);
 			process.chdir(currentCwd);
 		} return exports;
 	}
@@ -164,7 +165,7 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 		};
 	});
 	{
-		const Module = require('module'), { _findPath, } = Module;
+		const { _findPath, } = Module;
 		Module._findPath = function(path) {
 			path = _findPath.apply(Module, arguments);
 			if (path && path.startsWith(extDir) && (path.length === extDir.length || path[extDir.length] === '\\' || path[extDir.length] === '/'))

@@ -27,6 +27,11 @@ const windows = os === 'win32';
 const scriptExt = windows ? '.bat' : '.sh';
 const installDir = (windows ? process.env.APPDATA +'\\' : require('os').homedir() + (os === 'darwin' ? '/Library/Application Support/' : '/.')) + name;
 const outPath = path => Path.resolve(installDir, path);
+const manifest = browser => ({
+	name, description: 'WebExtensions native connector',
+	path: (windows ? '' : installDir +'/') + browser + scriptExt,
+	type: 'stdio', // mandatory
+});
 
 async function install({ source, }) {
 	try { source = require.resolve(source); } catch (_) { } node && (source = Path.resolve(source, '..'));
@@ -35,11 +40,6 @@ async function install({ source, }) {
 	+ (node ? node +` "${binTarget}"` : `"${binTarget}"`) // use absolute paths. The install dir can't be moved anyway
 	+' '+ args.map(s => (/^(?:%[*\d]|\$[@\d]|\w+)$/).test(s) ? s : JSON.stringify(s)).join(' ');
 
-	const manifest = browser => ({
-		name, description: 'WebExtensions native connector',
-		path: (windows ? '' : installDir +'/') + browser + scriptExt,
-		type: 'stdio', // mandatory
-	});
 
 	try {
 		(await unlink(binTarget));
@@ -112,28 +112,38 @@ async function install({ source, }) {
 }
 
 async function refresh() {
-	const urls = [ ], ids = [ ];
-	(await (await readdir(outPath('vendors'))).filter(_=>!_.startsWith('.')).map(name =>
-		readFile(outPath('vendors/'+ name))
-		.then(config => {
-			config = JSON.parse(config);
-			config['chrome-ext-urls'] && urls.push(...config['chrome-ext-urls']);
-			config['firefox-ext-ids'] && ids.push(...config['firefox-ext-ids']);
-		}).catch(error => console.error(error))
-	));
 
-	(await Promise.all([
-		!windows &&
-		replaceFile(outPath('chromium.json'),  JSON.stringify(
-			Object.assign(JSON.parse((await readFile(outPath('chromium.json')))), { allowed_origins: urls, }),
-		null, '\t'), 'utf8'),
-		replaceFile(outPath('chrome.json'),  JSON.stringify(
-			Object.assign(JSON.parse((await readFile(outPath('chrome.json')))), { allowed_origins: urls, }),
-		null, '\t'), 'utf8'),
-		replaceFile(outPath('firefox.json'),  JSON.stringify(
-			Object.assign(JSON.parse((await readFile(outPath('firefox.json')))), { allowed_extensions: ids, }),
-		null, '\t'), 'utf8'),
-	]));
+	const vendors = { }, allowed = { };
+
+	(await Promise.all((await readdir(outPath('vendors'))).map(async name => { try {
+		if (name.startsWith('.')) { return; }
+		vendors[name] = JSON.parse((await readFile(outPath('vendors/'+ name), 'utf-8'))) || { };
+	} catch (error) {
+		console.error(`failed to parse vendors/${name} as JSON`);
+	} })));
+
+	for (const { browser, source, target, match, } of [
+		{ browser: 'chrome', source: 'chrome-ext-urls', target: 'allowed_origins', match: (/^chrome-extension:\/\/[a-p]{32}\/$/), },
+		{ browser: 'firefox', source: 'firefox-ext-ids', target: 'allowed_extensions', match: (/^[\w.-]*@[\w.-]+$|^\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}$/), },
+	]) {
+		// let json; try { json = JSON.parse((await readFile(outPath(browser +'.json')))); } catch (error) { json = manifest(browser); }
+		// const before = new Set(Array.isArray(json[target]) ? json[target] : [ ])
+		const ids = allowed[browser] = new Set;
+
+		Object.entries(vendors).forEach(([ name, { [source]: add, }, ]) => {
+			if (!Array.isArray(add)) { add && console.error(`${name} -> ${source} was ignored because it is not a JSON Array`); return; }
+			add.forEach(id => {
+				if (!match.test(id)) { console.error(`${name} -> ${source}: ignored "${id}", as it is not a valid string`); return; }
+				ids.add(id);
+			});
+		});
+
+		const write = browser => replaceFile(outPath(browser +'.json'),  JSON.stringify(
+			Object.assign(manifest(browser), { [target]: Array.from(ids), }),
+		null, '\t'), 'utf8');
+		write(browser); !windows && browser === 'chrome' && write('chromium');
+	}
+	console.info(`Now allowing ${allowed.chrome.size} Chrome extensions and ${allowed.firefox.size} Firefox add-ons`);
 }
 
 async function uninstall() {

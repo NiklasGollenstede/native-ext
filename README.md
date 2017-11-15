@@ -132,6 +132,19 @@ NativeExt can automatically update its manifest, but the ids of the allowed exte
 The name of your file should be your extensions name/id/domain or that of its developing organization and should probably not contain spaces.
 
 
+### Extension location
+
+As NativeExt loads code from inside the extension package, it needs to locate the local extension installation.
+Currently, the only supported location is in the `extensions/` (or `Extensions/`) folder in the profile, which is correct for normal extension installations.
+
+Extensions that are temporary loaded during development have to be linked or copied to the extension folder to be accessible.
+There are several supported ways to do this:
+- zip the extension and place it as `{ext-id}.xpi` inside the extensions folder (Firefox only)
+- copy the unpacked extension to the extension folder
+- link the (packed or unpacked) extension to the extension folder (not recommended, the browsers tend to (recursively) delete everything in that folder on restart)
+- put a text file called `{ext-id}` inside the extension folder, whose only content is the absolute path to your unpacked extension
+
+
 ### Building
 
 Building NativeExt requires node.js in the exact version listed in the `package.json`/`"scripts"`.`"build"` command (currently 8.3), npm and [node-gyp](https://github.com/nodejs/node-gyp#installation) including its dependencies. After cloning or downloading the sources, install the dependencies with:

@@ -2,6 +2,7 @@
 	'node_modules/web-ext-utils/browser/': { runtime, rootUrl, manifest, Storage: { local: Storage, }, },
 	'node_modules/web-ext-utils/lib/multiport/': Port,
 	'node_modules/web-ext-utils/utils/event': { setEvent, },
+	module,
 }) => { const Native = { };
 
 let channel = null; const refs = new Map, cache = { __proto__: null, };
@@ -102,8 +103,16 @@ const initHandlers = {
 	},
 };
 
+async function test() {
+	if (channel && channel.port.version) { return true; }
+	let ref; try { ref = (await require(module.require.resolve('./version-native'))); }
+	catch (error) { console.error('Connection to native-ext failed', error); return false; }
+	global.setTimeout(() => unref(ref), 0);
+	return true;
+}
+
 return Object.assign(Native, {
-	require, unref, nuke: disconnect,
+	require, unref, nuke: disconnect, test,
 	get version() { return channel && channel.port.version; },
 });
 

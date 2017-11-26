@@ -17,6 +17,12 @@ Alternatively, you can [build NativeExt](#building) yourself.
 	- b) Create a file in the `vendors/` subdir as described in the [registration files](#registration-files) section below.
 	- c) Run the `refresh.bat`/`refresh.sh` file in the installation directory.
 
+### Update
+
+Version compatibility has a hight priority for the NativeExt application; extension updates should only very rarely, if ever, require an update of NativeExt.
+To update, close all running instances of NativeExt (by closing all browsers or disabling all extensions that use it, or simply by killing all it's processes) and do a normal installation.
+
+
 ### Uninstallation
 
 If you want to unregister an extension, delete its registration file from the `/vendors/` directory, then run the refresh script again.
@@ -153,7 +159,7 @@ Building NativeExt requires node.js in the exact version listed in the `package.
 
 Now you can either install directly from the sources (this creates symlinks, so keep the sources and node.js of the correct version):
 
-`node install`
+`node . install`
 
 build only for your current system:
 
@@ -164,3 +170,10 @@ or for all supported platforms:
 `npm run build-all` (these will not work with Chrome or extensions that rely on `ffi`, which needs to be build explicitly for each platform)
 
 The builds will be placed in the `/release` folder.
+
+
+### Extension debugging
+
+To be able to attach an inspector to the native process, install from sources and add `--node-options=--inspect` or `--node-options=--inspect-brk` as install argument. E.g.:
+
+`node . install --node-options=--inspect-brk`.

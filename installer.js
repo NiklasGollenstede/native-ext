@@ -21,7 +21,7 @@ const execute = (bin, ...args) => new Promise((resolve, reject) => child_process
 
 const name = 'de.niklasg.native_ext'; // must match \w[\w.]*\w (so no '-')
 const nodeOptions = process.argv.find(_=>_.startsWith('--node-options='));
-const node = process.argv[1].startsWith(Path.resolve('/snapshot/')) ? '' : 'node'+ (nodeOptions ? ' '+ nodeOptions.slice(15).replace(/,/g, ' ') : '');
+const node = process.versions.pkg ? '' : 'node'+ (nodeOptions ? ' '+ nodeOptions.slice(15).replace(/,/g, ' ') : '');
 const os = process.platform;
 const windows = os === 'win32';
 const scriptExt = windows ? '.bat' : '.sh';

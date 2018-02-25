@@ -9,12 +9,10 @@
 		"url": "git@github.com:NiklasGollenstede/native-ext.git"
 	},
 	"peerDependencies": {
-		"web-ext-utils": "0.0.13"
+		"web-ext-utils": "0.0.17"
 	},
 	"devDependencies": {
-		"babel-eslint": "7.1.1",
-		"eslint": "3.14.1",
-		"eslintrc": "NiklasGollenstede/eslintrc",
+		"eslintrc": "github:NiklasGollenstede/eslintrc",
 		"extract-zip": "1.6.5",
 		"ffi": "2.2.0",
 		"multiport": "0.2.2",
@@ -33,6 +31,7 @@
 		]
 	},
 	"scripts": {
+		"postinstall": "RMDIR /s /q node_modules\\es5-ext || rm -rf node_modules/es5-ext",
 		"test": "mocha test/selenium --recursive",
 		"build": "node pkg . -o release/native-ext -t node8.3 --public",
 		"build-all": "node pkg . -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64 --public",

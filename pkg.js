@@ -1,5 +1,9 @@
 'use strict'; (async () => {
 
+/**
+ * `pkg` refuses to include `.node` files, even if they are explicitly listed as assets.
+ * This hack fixes that.
+ */
 
 const Path = require('path');
 const assets = require('./package.json').pkg.assets.map(path => Path.join(__dirname, path));

@@ -92,13 +92,13 @@ const initHandlers = {
 		if (typeof Native.options.getChromeProfileDirName === 'function') { return Native.options.getChromeProfileDirName(); }
 		const key = '__native-ext__.chromeProfileDirName';
 		const { [key]: stored, } = (await Storage.get(key)); if (stored) { return stored; }
-		let maybe = global.prompt( // prompt doesn't really work for this because it blocks the browser
-			`To communicate with your OS to enable some advanced features, ${manifest.name} needs to know the name of your Chrome profile directory.
-			Please paste the path left of "Profile Path" on "chrome://version/" below:`.replace(/^\s+/gm, ''),
-			'',
+		let maybe = global.prompt( // prompt doesn't really work well for this as it blocks the browser UI
+			`It seems that ${manifest.name} is not installed in the "Default" chrome profile.
+			To communicate with your OS to enable some advanced features, ${manifest.name} needs to know the name of your current Chrome profile directory.
+			Please paste the profile directory name or path below. If you don't know it, dismiss this mesage, go to "chrome://version/" and copy the "Profile Path" from there, then try again:`.replace(/^\s+/gm, ''), '',
 		);
 		maybe && (maybe = maybe.replace(/^.*[\\\/]/, ''));
-		maybe && channel.port.inited.then(() => { console.log('saving profile'); Storage.set({ [key]: maybe, }); }); // save if connection succeeds
+		maybe && channel.port.inited.then(() => { console.log('saving profile'); Storage.set({ [key]: maybe, }); }); /* save if connection succeeds */ // eslint-disable-line no-console
 		return maybe;
 	},
 };

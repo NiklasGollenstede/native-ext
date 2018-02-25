@@ -3,4 +3,3 @@ node_modules
 /log.txt
 /npm-debug.log
 /npm-debug.log.*
-/package-lock.json

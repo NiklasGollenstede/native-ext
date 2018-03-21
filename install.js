@@ -3,14 +3,18 @@
 	Tar,
 }) => {
 
+const { navigator: { userAgent, oscpu, }, } = global;
+const windows = (/windows/i).test(userAgent), macos = !windows && (/mac\s*os\s*x/i).test(userAgent);
+const arch = macos || (windows ? (/x64/).test(oscpu) : (/x86_64/).test(oscpu) && !(/i386/).test(oscpu)) ? 'x64' : 'x86';
+const os = windows ? 'win' : macos ? 'macos' : 'linux';
+
 const chromeUrl = !gecko ? rootUrl : /*manifest.applications && manifest.applications.chrome && manifest.applications.chrome.id && `chrome-extension://${manifest.applications.chrome.id}/` ||*/ undefined;
 const firefoxId = gecko ? runtime.id : manifest.applications && manifest.applications.gecko && manifest.applications.gecko.id || undefined;
 const json = JSON.stringify({ 'firefox-ext-ids': firefoxId && [ firefoxId, ], 'chrome-ext-urls': chromeUrl && [ chromeUrl, ], });
-const windows = (/windows/i).test(global.navigator.userAgent), macos = !windows && (/mac\s*os\s*x/i).test(global.navigator.userAgent);
 const unixPath = macos ? '~/Library/Application\\ Support/de.niklasg.native_ext' : '~/.de.niklasg.native_ext';
 const script = (windows
 	? `echo ${json} > %APPDATA%\\de.niklasg.native_ext\\vendors\\re-style.json\r\n%APPDATA%\\de.niklasg.native_ext\\refresh.bat`
-	: `#!/bin/bash\necho ${JSON.stringify(json)} > ${ unixPath }/vendors/re-style.json\n${ unixPath }/refresh.sh`
+	: `#!/bin/bash\necho ${JSON.stringify(json)} > ${unixPath}/vendors/re-style.json\n${unixPath}/refresh.sh`
 );
 const url = global.URL.createObjectURL(windows
 	? new global.Blob([ script, ], { type: 'application/x-bat', })
@@ -24,6 +28,9 @@ const name = `add ${manifest.name}.${windows ? 'bat' : 'tar'}`;
 
 return {
 	script: { name, text: script, url, },
+	download: {
+		direct: `https://latest.native-ext.niklasg.de/download/${os}-${arch}/`,
+	},
 };
 
 }); })(this);

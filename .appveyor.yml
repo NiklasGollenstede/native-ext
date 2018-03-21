@@ -67,4 +67,4 @@ deploy:
   force_update: false # name should be unique anyway
   on:
     branch: master                 # release from master branch only
-    appveyor_repo_tag: false       # if triggered manually on non-tag, still deploy
+    # don't restrict appveyor_repo_tag: if triggered manually on non-tag, still deploy

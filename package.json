@@ -1,6 +1,6 @@
 {
 	"name": "native-ext",
-	"version": "0.2.3",
+	"version": "0.2.4",
 	"description": "WebExtensions native connector",
 	"author": "Niklas Gollenstede",
 	"license": "MIT",
@@ -31,7 +31,7 @@
 		]
 	},
 	"scripts": {
-		"postinstall": "RMDIR /s /q node_modules\\es5-ext || rm -rf node_modules/es5-ext",
+		"postinstall": "RMDIR /s /q node_modules\\es5-ext || rm -rf node_modules/es5-ext || echo .",
 		"test": "mocha test/selenium --recursive",
 		"build": "node pkg . -o release/native-ext -t node8.3 --public",
 		"build-all": "node pkg . -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64 --public",

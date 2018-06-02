@@ -1,0 +1,27 @@
+{
+	"name": "native-ext",
+	"version": "0.3.0",
+	"title": "NativeExt",
+	"description": "WebExtensions native connector management extension",
+	"author": "Niklas Gollenstede",
+	"license": "MPL-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git@github.com:NiklasGollenstede/native-ext.git"
+	},
+	"dependencies": {
+		"multiport": "0.2.3",
+		"pbq": "0.3.3",
+		"web-ext-build": "0.0.9",
+		"web-ext-utils": "0.1.0"
+	},
+	"scripts": {
+		"postinstall": "npm link native-ext && npm start",
+		"start": "web-ext-build",
+		"sign": "web-ext-build {beta:$APPVEYOR_BUILD_NUMBER,sign:1}",
+		"lint": "eslint --ignore-path .gitignore ."
+	},
+	"eslintConfig": {
+		"extends": "../node_modules/eslintrc/web-ext.js"
+	}
+}

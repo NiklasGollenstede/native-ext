@@ -43,9 +43,9 @@ return class Tar {
 	}
 
 	toBlob() {
-		return new global.Blob(this._buffers, { type: 'application/x-tar', });
+		return new global.Blob(this._buffers.concat([ Tar.alloc(2 * 512), ]), { type: 'application/x-tar', });
 	}
-	toBuffer() {
+	toBuffer() { // does not add the 2*512 zero bytes
 		const size = this._buffers.reduce((s, b) => s + b.length, 0);
 		const out = Tar.alloc(size); let offset = 0;
 		this._buffers.forEach(buffer => { out.set(buffer, offset); offset += buffer.length; });

@@ -13,9 +13,9 @@ Alternatively, you can [build NativeExt](#building) yourself.
 2. **Installation**: Just double-click (run/open) the downloaded file. It should not require elevated privileges of any kind. After a few seconds, you should see a success message.
 3. **Extension registration**: For the browsers to allow the communication between your extensions and NativeExt, the extensions need to be registered. If the extension in question provided you with an registration script, run that and you are done.\
 *Otherwise*:
-	- a) Open the installation directory, which is `%APPDATA%\de.niklasg.native_ext` on Windows, `~/.de.niklasg.native_ext` on Linux and `~/Library/Application Support/de.niklasg.native_ext` on macOS.
-	- b) Create a file in the `vendors/` subdir as described in the [registration files](#registration-files) section below.
-	- c) Run the `refresh.bat`/`refresh.sh` file in the installation directory.
+	(a) Open the installation directory, which is `%APPDATA%\de.niklasg.native_ext` on Windows, `~/.de.niklasg.native_ext` on Linux and `~/Library/Application Support/de.niklasg.native_ext` on macOS.
+	(b) Create a file in the `vendors/` subdir as described in the [registration files](#registration-files) section below.
+	(c) Run the `refresh.bat`/`refresh.sh` file in the installation directory.
 
 ### Update
 

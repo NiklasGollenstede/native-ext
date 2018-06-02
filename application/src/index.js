@@ -6,14 +6,12 @@ const args = process.argv.slice(2);
 
 switch (args[0]) {
 	case undefined: // started from file system / without args ==> install
-	case 'install': case 'refresh': case 'uninstall': {
+	case 'install': /*case 'refresh': case 'uninstall':*/ {
 		const command = args[0] || 'install';
-		(await require('./installer.js')[command]({
-			source: process.argv[1].startsWith(require('path').resolve('/snapshot/')) ? process.argv[0] : __dirname,
-		}));
+		(await require('./installer.js')[command]());
 		dialog('info', 'Native-Ext', `Operation ${ command } successful`);
 	} break;
-	case 'connect': {
+	case 'config': case 'connect': {
 		require('./connect.js');
 	} break;
 	default: {

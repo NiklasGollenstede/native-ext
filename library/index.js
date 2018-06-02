@@ -1,4 +1,4 @@
-/* eslint-disable strict */ (function(global) { 'use strict'; define(async ({ /* global define, */ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+(function(global) { 'use strict'; define(async ({ /* global define, */ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 	'node_modules/web-ext-utils/browser/': { runtime, rootUrl, manifest, Storage: { local: Storage, }, },
 	'node_modules/web-ext-utils/lib/multiport/': Port,
 	'node_modules/web-ext-utils/utils/event': { setEvent, },
@@ -97,7 +97,7 @@ const initHandlers = {
 			To communicate with your OS to enable some advanced features, ${manifest.name} needs to know the name of your current Chrome profile directory.
 			Please paste the profile directory name or path below. If you don't know it, dismiss this mesage, go to "chrome://version/" and copy the "Profile Path" from there, then try again:`.replace(/^\s+/gm, ''), '',
 		);
-		maybe && (maybe = maybe.replace(/^.*[\\\/]/, ''));
+		maybe && (maybe = maybe.replace(/^.*[\\/]/, ''));
 		maybe && channel.port.inited.then(() => { console.log('saving profile'); Storage.set({ [key]: maybe, }); }); /* save if connection succeeds */ // eslint-disable-line no-console
 		return maybe;
 	},

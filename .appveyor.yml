@@ -1,12 +1,23 @@
 ##
-# AppVeyor build automation configuration for Windows and Linux
+# AppVeyor build automation:
+# - application on Windows and Linux (x86 + x64)
+# - signed extension dev-release
 ##
+
+branches: { only: [ master ] } # build only on master
+skip_non_tags: false # build on every commit push (or manually)
+skip_tags: true # (commits create tags, so) don't build on tags
+# appveyor automatically skips commits with `[skip ci]` in the message (title)
+
 
 image: # build for windows and linux
   - Visual Studio 2015
   - Ubuntu
 
 environment:
+  AMO_JWT_ISSUER: "user:11844708:244" # generate at https://addons.mozilla.org/developers/addon/api/key/
+  AMO_JWT_SECRET: # encrypt the secret with https://ci.appveyor.com/tools/encrypt
+    secure: qK0cmL39oH20zxiczXoa9W/xovxGLKXDx/bgBGBfTSJ3mqw/smXs3nE1eHGaOpwgVb3yn1/d76USsqFD0+2K70ZIp1OpHNrs4pjw9oaIc2g=
   nodejs_version: "8.3.0"
   matrix:
     - nodejs_arch: "x64"
@@ -20,7 +31,8 @@ install:
   #
   # read version from package.json
   - ps: $env:package_version = (Get-Content -Raw -Path package.json | ConvertFrom-Json).version
-  - ps: Update-AppveyorBuild -Version "$env:package_version-$env:APPVEYOR_BUILD_NUMBER"
+  - ps: $env:manifest_version = "$($env:package_version)b$($env:APPVEYOR_BUILD_NUMBER)"
+  - ps: Update-AppveyorBuild -Version "$env:manifest_version"
   #
   # install specified version of node.js
   # windows
@@ -38,27 +50,52 @@ install:
           node -e 'console.log("process.arch:", process.arch)'
       fi
   #
+  # application build
+  - cd application
   # install modules, build ffi
   - npm install
-  #
   # pack
-  - npm run build
-  - cmd: cd release && ren native-ext.exe native-ext-v%package_version%-win-%nodejs_arch%.exe
-  - sh:  cd release && mv  native-ext     native-ext-v$package_version-linux-$nodejs_arch
+  - npm run build && cd release
+  - cmd: ren native-ext.exe native-ext-v%package_version%-win-%nodejs_arch%.exe
+  - sh:  mv  native-ext     native-ext-v$package_version-linux-$nodejs_arch
+  - cd ..
+  # application build done
+  - cd ..
+  #
+  # extension build
+  - sh: |
+      if [ $nodejs_arch = 'x64' ]; then
+          #
+          cd library && npm link && cd .. # must be available to link
+          #
+          cd extension
+          mkdir artifacts
+          #
+          npm install # install and create a unsigned potential release version
+          mv build/*.zip artifacts # move to artifacts for optional manual publish
+          #
+          npm run sign # create `-dev`-channel beta build, uses $APPVEYOR_BUILD_NUMBER for version
+          mv build/*.xpi artifacts # move to artifacts for GitHub release
+          #
+          # invalidate current automatic update manifest, see https://gist.github.com/NiklasGollenstede/60aa2dc957f985eff2b7a2655ea1092b
+          export update_url=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync("./build/manifest.json")).applications.gecko.update_url || "")')
+          # must do it manually after publishing the release on GitHub
+          echo wget --method=DELETE -qO- $update_url > artifacts/update.sh
+          #
+          cd ..
+      fi
 
 build: off # already done in install step
 
 # grab renamed file from release/
 artifacts:
-  - path: release/*
-
-# build on tags only
-skip_non_tags: true
+  - path: application/release/*
+  - path: extension/artifacts/*
 
 deploy:
+  release: v$(manifest_version) # rename manually to v$(package_version), which should be the name of the pushed tag
+  description: build v$(manifest_version) # edit manually
   provider: GitHub
-  release: v$(appveyor_build_version) # rename manually to v$(package_version), which should be the name of the pushed tag
-  description: build v$(appveyor_build_version) # edit manually
   auth_token: # created in GitHubs UI (public repo only), then encrypted in AppVoeyors UI
     secure: maxxggRkssdjgLe3OEQaVQXBOtFyHVit/AsK0gBqSn8Uwf2tg9w/dvAR5Ivyn27O
   artifact: /.*/

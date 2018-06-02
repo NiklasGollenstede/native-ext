@@ -1,66 +1,45 @@
-'use strict'; const ready = (async () => { (await null);
+'use strict'; let channel; module.exports = (async () => { (await null)/*why?*/;
 
 /**
  * This module is run once on startup and prepares the process to run the node.js modules provided by the connecting extension.
  */
 
-// Not sure who messed this up, but the path to the manifest file passed by firefox is split into two args on macos. This is an ugly workaround
-process.platform === 'darwin' && process.argv[3] === 'firefox' && process.argv[4] === '/Users/user/Library/Application' && process.argv.splice(4, 2, process.argv[4] +' '+ process.argv[5]);
-
 
 const FS = Object.assign({ }, require('fs')), Path = require('path');
-const _package = module.require(Path.join(__dirname, 'package.json'));
 const Module = require('module');
+const packageJson = module.require(Path.join(__dirname, '../package.json'));
+const config = JSON.parse(FS.readFileSync(process.argv[3]));
 
 
 // set up communication
-const Port = require('./node_modules/multiport/index.js'), port = new Port(
-	new (require('./runtime-port.js'))(process.stdin.on.bind(process.stdin, 'data'), process.stdout.write.bind(process.stdout)),
-	Port.web_ext_Port,
-);
+channel = new (require('./runtime-port.js'))({
+	name: '',
+	onData: process.stdin.on.bind(process.stdin, 'data'),
+	write: process.stdout.write.bind(process.stdout),
+}); process.stdin.pause(); // wait for now
+require('./redirect-stdout.js')({ channel, }); // can't log to stdio if started by the browser ==> forward to browser console
 
 
-{ // can't log to stdio if started by the browser ==> forward to browser console
-	const { Writable, } = require('stream'); let stream;
-	if (process.versions.electron) { // console is fine (doesn't write to stdio), but need to redirect explicit stdio writes to it
-		stream = name => new Writable({ write(chunk, encoding, callback) {
-			console.log(name, chunk, encoding); callback && Promise.resolve().then(callback); // eslint-disable-line
-		}, });
-	} else {
-		stream = name => new Writable({ write(chunk, encoding, callback) {
-			if ((/^utf-?8$/i).test(encoding)) { encoding = ''; }
-			else if (encoding !== 'buffer') { chunk = global.Buffer.from(chunk, encoding); }
-			if (typeof chunk !== 'string') { chunk = chunk.toString('base64'); }
-			port.post(name, encoding, chunk);
-			callback && Promise.resolve().then(callback);
-		}, decodeStrings: false, });
-	}
-	const stdout = stream('stdout'), stderr = stream('stderr');
-
-	// When the process is being `--inspect`ed, the functions of the global console are overwritten
-	// and the arguments logged to the inspector before they are passed on tho the original global console.
-	// Replacing the global console object would thus break the logging in the inspector.
-	// The original console calls the public `.write()` methods on the original process.stdout/err streams,
-	// so replacing those methods with the ones from the new streams prevents the console from actually writing to fd 1 or 2.
-	// This should also help with all other (js) modules which already grabbed the original process.stdout/err.
-	process.stdout.write = stdout.write.bind(stdout); Object.defineProperty(process, 'stdout', { value: stdout, });
-	process.stderr.write = stderr.write.bind(stderr); Object.defineProperty(process, 'stderr', { value: stderr, });
-
-	process.on('uncaughtException', async error => !(await port.request('error', error)) && process.exit(1));
-	process.on('unhandledRejection', async error => !(await port.request('reject', error)) && process.exit(1));
+if (process.argv[2] === 'config') { // configuration mode
+	const Port = require('multiport'), port = new Port(channel, Port.web_ext_Port);
+	// only the management extension is allowed to connect like this
+	port.addHandlers({
+		locateProfile: require('./locate-profile.js')({ config, }),
+		async writeProfile({ dir, ids, locations, }) {
+			FS.accessSync(dir); const { browser, } = config;
+			const manifest = (await require('./installer.js').writeProfile({ browser, dir, ids, locations, }));
+			return { name: manifest.name, version: packageJson.version, };
+		},
+	});
+	process.stdin.resume(); return;
 }
 
 
-let protocol; { // protocol negotiation
-	const remote = (await new Promise(done => port.addHandler('init', opts => { done(opts); port.removeHandler('init'); return ready; })));
-	const local = [ '0.2', ]; protocol = remote.versions.find(_=>local.includes(_));
-	if (!protocol) { throw new Error(`Protocol version mismatch, extension supports ${remote.versions} and the installed version ${_package.version} of NativeExt supports ${local}`); }
-}
-
-
-const modules = { __proto__: null, }; let originalRequireResolve; { // extend require
+const { modules, requireClean, exposeLazy, } = (() => { // patch `require()` to expose modules
+	const modules = { __proto__: null, };
 	const { _resolveFilename, _load, } = Module;
-	originalRequireResolve = _resolveFilename;
+	const cwd = process.cwd();
+
 	Module._resolveFilename = function(path) {
 		if (path in modules) { return path; }
 		return _resolveFilename.apply(Module, arguments);
@@ -69,13 +48,29 @@ const modules = { __proto__: null, }; let originalRequireResolve; { // extend re
 		if (path in modules) { return modules[path]; }
 		return _load.apply(Module, arguments);
 	};
-} function exposeLazy(name, getter) {
-	Object.defineProperty(modules, name, { configurable: true, enumerable: true, get() {
-		const value = getter();
-		Object.defineProperty(modules, name, { value, });
-		return value;
-	}, });
-}
+
+	function requireClean(id) { // use local require and original cwd, restore and cleanup afterwards
+		const currentCwd = process.cwd();
+		Module._cache = Object.create(Module._cache);
+		let exports; try {
+			process.chdir(cwd);
+			exports = module.require(_resolveFilename(id, module));
+		} finally {
+			Module._cache = Object.getPrototypeOf(Module._cache);
+			process.chdir(currentCwd);
+		} return exports;
+	}
+
+	function exposeLazy(name, getter) {
+		Object.defineProperty(modules, name, { configurable: true, enumerable: true, get() {
+			const value = getter();
+			Object.defineProperty(modules, name, { value, });
+			return value;
+		}, });
+	}
+
+	return { modules, requireClean, exposeLazy, };
+})();
 
 
 { // expose and lazy load 'ffi' and 'ref'
@@ -100,23 +95,12 @@ const modules = { __proto__: null, }; let originalRequireResolve; { // extend re
 			bindingsModule.exports = bindingsExports;
 		} return exports;
 	}; }
-
-	function requireClean(id) { // use local require and original cwd, restore and cleanup afterwards
-		const currentCwd = process.cwd();
-		Module._cache = Object.create(Module._cache);
-		let exports; try {
-			process.chdir(cwd);
-			exports = module.require(originalRequireResolve(id, module));
-		} finally {
-			Module._cache = Object.getPrototypeOf(Module._cache);
-			process.chdir(currentCwd);
-		} return exports;
-	}
 }
 
 
 // load and expose 'browser' infos
-const browser = modules.browser = (await require('./browser.js')({ versions: protocol, port, }));
+const browser = modules.browser = (await require('./browser.js')({ config, }));
+channel.name = browser.extId;
 
 
 // set up file system
@@ -177,7 +161,7 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 
 
 { // general process fixes
-	process.versions.native_ext = _package.version;
+	process.versions.native_ext = packageJson.version;
 	process.argv.splice(0, Infinity);
 	process.mainModule.filename = extRoot + Path.sep +'.';
 	process.mainModule.paths = module.constructor._nodeModulePaths(process.mainModule.filename);
@@ -187,23 +171,31 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 }
 
 
-// add permanent handlers
-port.addHandlers({
-	async require(path, options, callback) {
-		if (!(/\bn(?:ative|ode)\.js$|(?:^|[\\\/])n(?:ative|ode)[\\\/]/).test(path)) {
-			throw new Error(`path must contain /node/ or /native/ or end with \\bnode.js or \\bnative.js`);
-		}
-		const exports = (await process.mainModule.require(Path.join('/webext/', path)));
-		(await typeof exports !== 'object' ? callback(exports) : callback(...[].concat(...Object.entries(exports))));
-	},
-});
-
-
 { // cleanup
 	const { cache, } = require; // there are still references to the loaded modules ...
 	Object.keys(cache).forEach(key => delete cache[key]);
 	global.gc && global.gc();
 }
-console.info('native-ext running in', process.cwd());
 
-})();
+
+{ // init
+	const config = (await new Promise(done => {
+		channel.onMessage.addListener(function onMessage(config) {
+			done(config); channel.onMessage.removeListener(onMessage);
+		}); process.stdin.resume();
+	}));
+	if (!config.allowEval) {
+		// this is incomplete (e.g. the 'vm' module is still available), but it should prevent accidental data evaluation
+		const _Function = function noEval() { throw new Error(`new Function and eval are not allowed`); }.bind();
+		Object.defineProperty(_Function, 'name', { value: 'Function', }); Object.defineProperty(_Function, 'length', { value: 1, });
+		const _eval = { noEval() { throw new Error(`new Function and eval are not allowed`); }, }.noEval.bind();
+		Object.defineProperty(_eval, 'name', { value: 'eval', }); Object.defineProperty(_eval, 'length', { value: 1, });
+		(_Function.prototype = _Function.constructor.prototype).constructor = _Function; global.eval = _eval;
+	}
+	(await process.mainModule.require('./'+ config.main)(channel));
+}
+
+})().catch(error => {
+	channel && channel.postMessage([ 'error', 0, JSON.stringify([ error.message, ]), ]);
+	setTimeout(() => process.exit(-1));
+});

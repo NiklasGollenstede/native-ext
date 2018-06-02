@@ -1,0 +1,5 @@
+node_modules
+/release/
+
+# TODO: update and filter dependencies, then commit package-lock.json
+package-lock.json

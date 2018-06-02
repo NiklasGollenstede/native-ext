@@ -1,15 +1,21 @@
 'use strict'; /* global Buffer, */
 
 /**
- * Transforms the .on('data') and .write() methods of the stdio streams of a node.js native messaging app
- * into something resembling a browser.runtime.Port (which never fires onDisconnect).
+ * Transforms the `.on('data')` and `.write()` methods of the stdio streams of a node.js
+ * native messaging app into a `browser.runtime.Port`.
  * Buffers incoming messages without limit and does not check the outgoing message sizes.
  * Sending messages that are to large will cause the browser to disconnect.
- * @param  {function}  onData  stdin.on.bind(stdin, 'data')
- * @param  {function}  write   stdout.write.bind(stdout)
- * @return {object}            Object of { postMessage, onMessage, onDisconnect, }.
+ * @param  {string}       .name       Value for `Port.name`.
+ * @param  {function}     .onData     `stdin.on.bind(stdin, 'data')`.
+ * @param  {function}     .write      `stdout.write.bind(stdout)`.
+ * @return {runtime.Port}             Object of:
+ * @property {string}     name            ID of the connecting extension.
+ * @property {function}   postMessage     Sends a JSON value to the `.onMessage` on the other end.
+ * @property {function}   disconnect      Kills the process.
+ * @property {Event}      onMessage       `browser.events.Event` that receives the`.postMessage`.
+ * @property {Event}      onDisconnect    Event that never fires.
  */
-module.exports = function runtimePort(onData, write) {
+module.exports = function runtimePort({ name, onData, write, }) {
 	const onMessage = new Set, empty = Buffer.alloc(0);
 
 	let expect = null, buffer = empty; onData(function onData(data) {
@@ -38,11 +44,15 @@ module.exports = function runtimePort(onData, write) {
 	}
 
 	return {
-		postMessage,
-		onMessage: {
-			addListener: onMessage.add.bind(onMessage),
-			removeListener: onMessage.delete.bind(onMessage),
-		},
-		onDisconnect: { addListener() { }, removeListener() { }, },
+		name, postMessage,
+		disconnect() { process.exit(0); },
+		onMessage: Event(onMessage),
+		onDisconnect: Event(new Set),
 	};
 };
+
+function Event(set) { return {
+	addListener: set.add.bind(set),
+	hasListener: set.has.bind(set),
+	removeListener: set.delete.bind(set),
+}; }

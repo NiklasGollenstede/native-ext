@@ -1,43 +1,19 @@
 {
 	"name": "native-ext",
-	"version": "0.2.4",
-	"description": "WebExtensions native connector",
+	"version": "0.3.0",
+	"description": "WebExtensions native connector library, application and extension",
 	"author": "Niklas Gollenstede",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
 		"url": "git@github.com:NiklasGollenstede/native-ext.git"
 	},
-	"peerDependencies": {
-		"web-ext-utils": "0.0.17"
-	},
 	"devDependencies": {
-		"eslintrc": "github:NiklasGollenstede/eslintrc",
-		"extract-zip": "1.6.5",
-		"ffi": "2.2.0",
-		"multiport": "0.2.2",
-		"pkg": "4.2.3",
-		"ref-array": "^1.2.0",
-		"ref-struct": "^1.1.0",
-		"rimraf": "2.6.1",
-		"tmp": "0.0.33"
-	},
-	"main": "start.js",
-	"bin": "start.js",
-	"pkg": {
-		"assets": [
-			"node_modules/ref/build/Release/binding.node",
-			"node_modules/ffi/build/Release/ffi_bindings.node"
-		]
+		"babel-eslint": "8.2.3",
+		"eslint": "4.19.1",
+		"eslintrc": "NiklasGollenstede/eslintrc#88b3327"
 	},
 	"scripts": {
-		"postinstall": "RMDIR /s /q node_modules\\es5-ext || rm -rf node_modules/es5-ext || echo .",
-		"test": "mocha test/selenium --recursive",
-		"build": "node pkg . -o release/native-ext -t node8.3 --public",
-		"build-all": "node pkg . -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64 --public",
-		"lint": "eslint --ignore-path .gitignore ."
-	},
-	"eslintConfig": {
-		"extends": "./node_modules/eslintrc/node.js"
+		"lint": "cd application && npm run lint && cd ../extension && npm run lint && cd ../library && npm run lint"
 	}
 }

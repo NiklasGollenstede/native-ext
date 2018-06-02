@@ -1,0 +1,39 @@
+{
+	"name": "native-ext",
+	"fullName": "de.niklasg.native-ext",
+	"version": "0.3.0",
+	"description": "WebExtensions native connector application",
+	"author": "Niklas Gollenstede",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git@github.com:NiklasGollenstede/native-ext.git"
+	},
+	"dependencies": {
+		"extract-zip": "1.6.5",
+		"ffi": "2.2.0",
+		"mkdirp": "0.5.1",
+		"multiport": "0.2.2",
+		"pkg": "4.2.3",
+		"ref-array": "^1.2.0",
+		"ref-struct": "^1.1.0",
+		"rimraf": "2.6.1",
+		"tmp": "0.0.33"
+	},
+	"main": "src/index.js",
+	"bin": "src/index.js",
+	"pkg": {
+		"assets": [
+			"node_modules/ref/build/Release/binding.node",
+			"node_modules/ffi/build/Release/ffi_bindings.node"
+		]
+	},
+	"scripts": {
+		"build": "node ./scripts/pkg.js . -o release/native-ext -t node8.3 --public",
+		"build-all": "node ./scripts/pkg.js . -o release/native-ext -t node8.3-linux-x86,node8.3-linux-x64,node8.3-macos-x64,node8.3-win-x86,node8.3-win-x64 --public",
+		"lint": "eslint --ignore-path .gitignore ."
+	},
+	"eslintConfig": {
+		"extends": "../node_modules/eslintrc/node.js"
+	}
+}

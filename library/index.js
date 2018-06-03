@@ -1,119 +1,71 @@
-(function(global) { 'use strict'; define(async ({ /* global define, */ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
-	'node_modules/web-ext-utils/browser/': { runtime, rootUrl, manifest, Storage: { local: Storage, }, },
-	'node_modules/web-ext-utils/lib/multiport/': Port,
-	'node_modules/web-ext-utils/utils/event': { setEvent, },
-	module,
-}) => { const Native = { };
+(function(global) { 'use strict'; define([ /* global define, */ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+	'./manager',
+], (Manager) => {
 
-let channel = null; const refs = new Map, cache = { __proto__: null, };
 
-Object.defineProperty(Native, 'options', { value: { __proto__: null, }, enumerable: true, });
-const fireError  = setEvent(Native, 'onUncaughtException', { lazy: false, });
-const fireReject = setEvent(Native, 'onUnhandledRejection', { lazy: false, });
+const exports = Object.assign(
+	new Manager({ getName: getApplicationName, }),
+	{ requestPermission, removePermission, getApplicationName, setApplicationName, },
+);
 
-function connect() {
-	if (channel) { return channel.port; }
 
-	// launch
-	channel = runtime.connectNative('de.niklasg.native_ext'); const port = channel.port = new Port(channel, Port.web_ext_Port);
+const { runtime, } = (global.browser || global.chrome);
 
-	// handle errors
-	channel.onDisconnect.addListener(() => {
-		port.error = Object.freeze(channel.error || runtime.lastError || new Error(`Native process was terminated`));
-	}); port.ended.then(disconnect);
 
-	// setup
-	port.addHandlers('init.', initHandlers);
-	port.inited = port.request('init', { versions: [ '0.2', ], }).then(version => (port.version = version));
-
-	// handle messages
-	port.addHandlers('c.', [ console.log, console.info, console.warn, console.error, ], console); // eslint-disable-line no-console
-	port.addHandlers({
-		stdout: (encoding, base64) => console.info('native-ext stdout:', encoding ? { encoding, base64, } : base64),
-		stderr: (encoding, base64) => console.warn('native-ext stderr:', encoding ? { encoding, base64, } : base64),
-	});
-	port.addHandler('error', error => fireError([ error, ])); port.addHandler('reject', error => fireReject([ error, ]));
-
-	return port;
+async function requestPermission({ message, }) {
+	const reply = (await sendMessage({ request: 'requestPermission', message, }));
+	if (reply.name) { setApplicationName(reply.name); }
+	return reply;
+}
+async function removePermission() {
+	return sendMessage({ request: 'removePermission', });
 }
 
-function disconnect() {
-	if (!channel) { return; } const { port, } = channel, { error, } = port; channel = null; port.destroy();
-	refs.forEach(obj => { if (obj) { try { obj.doClose(); obj.onDisconnect && obj.onDisconnect(error); } catch (error) { console.error(error); } } }); refs.clear();
-	Object.keys(cache).forEach(key => delete cache[key]);
+
+let appName;
+async function getApplicationName(force) {
+	if (!force) { try {
+		if (appName) { return appName; }
+		const name = (await (await getStore()).get('name'));
+		if (name) { return (appName = name); }
+	} catch (error) { console.error(error); } }
+	const reply = (await sendMessage({ request: 'getName', }));
+	const name = reply.name; if (!name) { throw new Error(`Failed to get native-ext app name`); }
+	setApplicationName(name); return name;
+}
+function setApplicationName(name) {
+	appName = name;
+	setTimeout(() => getStore().then(_=>_.set('name', name)));
 }
 
-async function require(path, { onDisconnect, } = { }) { const ref = { }, port = connect(); {
-	refs.set(ref, null); // add temporary reference
-} try {
 
-	let disconnected; channel.onDisconnect.addListener(() => {
-		disconnected = Object.freeze(channel.error || runtime.lastError || new Error(`Native process was terminated`));
-	});
-	(await port.inited);
+async function sendMessage(message) { return new Promise((resolve, reject) => {
+	let error, left = extIds.length; extIds.forEach((extId, index) => runtime.sendMessage(
+		extId, message, { }, reply => { if (runtime.lastError) {
+			!index && (error = runtime.lastError); left -= 1; !left && reject(error);
+		} else { resolve(reply); } },
+	));
+}); }
+const gecko = runtime.getURL('').startsWith('moz-');
+const extIds = gecko ? [ '@native-ext', '@native-ext-dev', ] : [ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ]; // TODO
 
-	// get (cached) remote refs or values
-	path = global.require.toUrl(path).replace(/(?:\.js)?$/, '.js').slice(rootUrl.length - 1);
-	let exports, resolve; const [ entries, ] = (await (cache[path] || (cache[path] = Promise.all([
-		new Promise(_=>(resolve=_)), port.request('require', path, null, (...args) => resolve(args)),
-	]))));
 
-	// create a unique exports object
-	let closed = null; function doClose() { closed = disconnected || new Error(`Can't use method of unrefed module`); }
-	function wrapFunc(func) { return function(...args) { if (closed) { throw closed; } else { return func(...args); } }; }
-	if (entries.length === 1) { // non-object
-		const value = entries[0]; if (typeof value === 'function') { exports = wrapFunc(value); } else { return value; }
-	} else { // object properties, every second entry is a value that may be a remote function
-		exports = { }; for (let i = 0; i < entries.length; i += 2) {
-			const key = entries[i], value = entries[i +1];
-			exports[key] = typeof value === 'function' ? wrapFunc(value) : value;
-		}
-	}
+let gettingDB; async function getStore() { return gettingDB || (gettingDB = (async () => {
+	const idb = (await getResult(Object.assign(global.indexedDB.open('native-ext', 1), {
+		onupgradeneeded({ target: { result: db, }, }) { db.createObjectStore('kv'); },
+	}))); return {
+		get(key)        { return getResult(idb.transaction([ 'kv', ], 'readwrite').objectStore('kv').get(key)); },
+		set(key, value) { return getResult(idb.transaction([ 'kv', ], 'readwrite').objectStore('kv').put(value, key)); },
+	};
+})()); }
+function getResult(request) { return new Promise((resolve, reject) => {
+	request.onsuccess = ({ target: { result, }, }) => resolve(result);
+	request.onerror = error => {
+		reject(error); request.abort && request.abort();
+		error.stopPropagation && error.stopPropagation();
+	};
+}); }
 
-	refs.set(exports, { doClose, onDisconnect, }); // add permanent reference
-	return exports;
-
-} catch (error) {
-	throw port.error || error; // if something went wrong with the port, then that is the actual problem
-} finally {
-	refs.delete(ref); refs.size === 0 && port && port.destroy(); // drop temporary reference
-} }
-
-function unref(ref) {
-	const it = refs.get(ref);
-	if (it === undefined) { return false; }
-	refs.delete(ref); refs.size === 0 && disconnect();
-	it && it.doClose();
-	return true;
-}
-
-const initHandlers = {
-	async getChromeProfileDirName() {
-		if (typeof Native.options.getChromeProfileDirName === 'function') { return Native.options.getChromeProfileDirName(); }
-		const key = '__native-ext__.chromeProfileDirName';
-		const { [key]: stored, } = (await Storage.get(key)); if (stored) { return stored; }
-		let maybe = global.prompt( // prompt doesn't really work well for this as it blocks the browser UI
-			`It seems that ${manifest.name} is not installed in the "Default" chrome profile.
-			To communicate with your OS to enable some advanced features, ${manifest.name} needs to know the name of your current Chrome profile directory.
-			Please paste the profile directory name or path below. If you don't know it, dismiss this mesage, go to "chrome://version/" and copy the "Profile Path" from there, then try again:`.replace(/^\s+/gm, ''), '',
-		);
-		maybe && (maybe = maybe.replace(/^.*[\\/]/, ''));
-		maybe && channel.port.inited.then(() => { console.log('saving profile'); Storage.set({ [key]: maybe, }); }); /* save if connection succeeds */ // eslint-disable-line no-console
-		return maybe;
-	},
-};
-
-async function test() {
-	if (channel && channel.port.version) { return true; }
-	let ref; try { ref = (await require(module.require.resolve('./version-native'))); }
-	catch (error) { console.error('Connection to native-ext failed', error); return false; }
-	global.setTimeout(() => unref(ref), 0);
-	return true;
-}
-
-return Object.assign(Native, {
-	require, unref, nuke: disconnect, test,
-	get version() { return channel && channel.port.version; },
-});
+return exports;
 
 }); })(this);

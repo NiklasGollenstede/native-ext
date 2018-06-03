@@ -12,17 +12,17 @@ module.exports = function({ options, /*packageJson,*/ manifestJson, files, }) {
 
 	manifestJson.options_ui.open_in_tab = false;
 
-	manifestJson.browser_action.default_icon = manifestJson.icons;
+	delete manifestJson.browser_action;
 
-	delete manifestJson.background.persistent;
+	delete manifestJson.background.persistent; // TODO: try event page in chrome
 
 	// TODO: only include necessary files
 	files.node_modules = [
 		'native-ext/index.js',
 		'native-ext/init.node.js',
-		'native-ext/install.js',
+		'native-ext/manager.js',
 		'native-ext/process.js',
-		'native-ext/tar.js',
+		'native-ext/test.node.js',
 		'multiport/index.js',
 		'pbq/require.js',
 		'web-ext-utils/browser/index.js',

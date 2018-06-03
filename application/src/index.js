@@ -8,7 +8,7 @@ switch (args[0]) {
 	case undefined: // started from file system / without args ==> install
 	case 'install': /*case 'refresh': case 'uninstall':*/ {
 		const command = args[0] || 'install';
-		(await require('./installer.js')[command]());
+		(await require('./install.js')[command]());
 		dialog('info', 'Native-Ext', `Operation ${ command } successful`);
 	} break;
 	case 'config': case 'connect': {

@@ -25,12 +25,12 @@ if (config.locations && (extId in config.locations)) {
 		else {
 			try { stat = FS.statSync(path); } catch (_) { }
 			if (stat && stat.isDirectory()) { browser.extDir = path; }
-			else { throw new Error(`The extension ${extId} is not installed in the default location in ${browser.profileDir}.`); }
+			else { throw new Error(`The extension ${extId} is not installed in the default location in ${browser.profileDir}`); }
 		}
 	} else { // chrome
 		const path = Path.join(browser.profileDir, 'Extensions', extId); let versions;
 		try { versions = FS.readdirSync(path); } catch (_) { }
-		if (!versions || !versions.length) { throw new Error(`The extension ${extId} is not installed in the default location in ${browser.profileDir}.`); }
+		if (!versions || !versions.length) { throw new Error(`The extension ${extId} is not installed in the default location in ${browser.profileDir}`); }
 		browser.extDir = Path.resolve(path, versions[versions.length]); // this should probably use the highest semver
 	}
 }

@@ -56,8 +56,8 @@ install:
   - npm install
   # pack
   - npm run build && cd release
-  - cmd: ren native-ext.exe native-ext-v%package_version%-win-%nodejs_arch%.exe
-  - sh:  mv  native-ext     native-ext-v$package_version-linux-$nodejs_arch
+  - cmd: ren native-ext.exe native-ext-v%manifest_version%-win-%nodejs_arch%.exe
+  - sh:  mv  native-ext     native-ext-v$manifest_version-linux-$nodejs_arch
   - cd ..
   # application build done
   - cd ..

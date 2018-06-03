@@ -18,6 +18,8 @@ setEventGetter(Process, 'uncaught', Self);
 setEventGetter(Process, 'rejected', Self);
 setEventGetter(Process, 'exit', Self, { once: true, });
 
+//// start implementation
+
 const { runtime, } = (global.browser || global.chrome);
 const rootUrl = runtime.getURL('');
 const initPath = require.toUrl('./init.node.js').slice(rootUrl.length - 1);
@@ -38,7 +40,7 @@ class _Process {
 		// handle errors
 		channel.onDisconnect.addListener(() => {
 			port.error = Object.freeze(channel.error || runtime.lastError || new Error(`Native process was terminated`));
-		}); port.ended.then(() => this.destroy);
+		}); port.ended.then(() => this.destroy());
 
 		// handle messages
 		port.addHandlers({

@@ -24,10 +24,11 @@ if (process.argv[2] === 'config') { // configuration mode
 	const Port = require('multiport'), port = new Port(channel, Port.web_ext_Port);
 	// only the management extension is allowed to connect like this
 	port.addHandlers({
+		ping() { return 'pong'; },
 		locateProfile: require('./locate-profile.js')({ config, }),
 		async writeProfile({ dir, ids, locations, }) {
 			FS.accessSync(dir); const { browser, } = config;
-			const manifest = (await require('./installer.js').writeProfile({ browser, dir, ids, locations, }));
+			const manifest = (await require('./install.js').writeProfile({ browser, dir, ids, locations, }));
 			return { name: manifest.name, version: packageJson.version, };
 		},
 	});
@@ -161,7 +162,7 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 
 
 { // general process fixes
-	process.versions.native_ext = packageJson.version;
+	process.versions['native-ext'] = packageJson.version;
 	process.argv.splice(0, Infinity);
 	process.mainModule.filename = extRoot + Path.sep +'.';
 	process.mainModule.paths = module.constructor._nodeModulePaths(process.mainModule.filename);

@@ -21,13 +21,14 @@ const source = unpacked ? __dirname : process.argv[0]; // location of packed exe
 // try { source = require.resolve(source); } catch (_) { } node && (source = Path.resolve(source, '..')); // TODO: ??
 
 const nodeOptions = process.argv.find(_=>_.startsWith('--node-options='));
-const nodeCommand = unpacked ? 'node'+ (nodeOptions ? ' '+ nodeOptions.slice(15).replace(/,/g, ' ') : '') : '';
 const windows = process.platform === 'win32', linux = process.platform === 'linux', macos = process.platform === 'darwin';
 const scriptExt = windows ? '.bat' : '.sh';
 const installDir = (windows ? process.env.APPDATA +'\\' : require('os').homedir() + (macos ? '/Library/Application Support/' : '/.')) + fullName;
 
 const outPath = (...path) => Path.resolve(installDir, ...path);
 const bin = outPath(`bin/${version}/${fullName}`) + (windows && !unpacked ? '.exe' : '');
+const exec = (...args) => (windows ? '@echo off\r\n\r\n' : '#!/bin/bash\n\n')
++ args.map(s => (/^(?:%[*\d]|\$[@\d]|[\w-]+)$/).test(s) ? s : JSON.stringify(s)).join(' ');
 
 async function install() {
 
@@ -37,11 +38,18 @@ async function install() {
 
 	(await Promise.all([
 
-		unpacked ? replaceLink(source, bin, 'junction')
-		: copyFile(bin, source).then(() => chmod(bin, '754')),
-		// TODO: would copyFile work on these?
-		readFile(Path.join(__dirname, '../node_modules/ref/build/Release/binding.node'))     .then(data => replaceFile(outPath(bin +'/../ref.node'), data)),
-		readFile(Path.join(__dirname, '../node_modules/ffi/build/Release/ffi_bindings.node')).then(data => replaceFile(outPath(bin +'/../ffi.node'), data)),
+		...(unpacked ? [
+			replaceFile(outPath('bin', 'latest'+ scriptExt), exec(
+				process.argv[0], process.argv[1],
+				...(nodeOptions ? nodeOptions.slice(15).split(',') : [ ]),
+				windows ? '%*' : '$@',
+			), { mode: '754', }),
+		] : [
+			copyFile(bin, source).then(() => chmod(bin, '754')),
+			readFile(Path.join(__dirname, '../node_modules/ref/build/Release/binding.node'))     .then(data => replaceFile(outPath(bin +'/../ref.node'), data)), // copyFile doesn't work
+			readFile(Path.join(__dirname, '../node_modules/ffi/build/Release/ffi_bindings.node')).then(data => replaceFile(outPath(bin +'/../ffi.node'), data)), // copyFile doesn't work
+			replaceFile(outPath('bin', 'latest'+ scriptExt), exec(bin, windows ? '%*' : '$@'), { mode: '754', }),
+		]),
 
 		!windows && writeProfile({ bin, browser: 'chromium', dir: '', ids: [ /* TBD */ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ], }),
 		writeProfile({ bin, browser: 'chrome', dir: '', ids: [ /* TBD */ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ], }),
@@ -57,10 +65,6 @@ async function writeProfile({ browser, dir, ids = [ ], locations, }) {
 	const profile = !dir ? browser : crypto.createHash('sha1').update(dir).digest('hex').slice(-16).padStart(16, '0');
 	const name = fullName +'.'+ profile;
 	const target = outPath('profiles', profile) + Path.sep;
-
-	const exec = (...args) => (windows ? '@echo off\r\n\r\n' : '#!/bin/bash\n\n')
-	+ (unpacked ? nodeCommand +' ' : '') + `"${bin}"` // use absolute paths. The install dir can't be moved anyway
-	+' '+ args.map(s => (/^(?:%[*\d]|\$[@\d]|\w+)$/).test(s) ? s : JSON.stringify(s)).join(' ');
 
 	!Array.isArray(ids) && (ids = [ ]);
 	const manifest = {
@@ -78,7 +82,12 @@ async function writeProfile({ browser, dir, ids = [ ], locations, }) {
 
 		replaceFile(target +'manifest.json', JSON.stringify(manifest,  null, '\t'), 'utf8'),
 		replaceFile(target +'config.json', JSON.stringify(config,  null, '\t'), 'utf8'),
-		replaceFile(target + packageJson.name + scriptExt, exec(!dir ? 'config' : 'connect', target +'config.json', '%*'), { mode: '754', }),
+		replaceFile(target + packageJson.name + scriptExt, exec(
+			outPath('bin', 'latest'+ scriptExt),
+			!dir ? 'config' : 'connect',
+			target +'config.json',
+			windows ? '%*' : '$@',
+		), { mode: '754', }),
 
 		windows ? execute('REG', 'ADD', (browser === 'firefox'
 			? 'HKCU\\Software\\Mozilla\\NativeMessagingHosts\\' : 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\'

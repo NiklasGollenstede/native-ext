@@ -6,6 +6,7 @@ module.exports = function({ options, /*packageJson,*/ manifestJson, files, }) {
 	manifestJson.permissions.push(
 		'nativeMessaging',
 		'notifications',
+		'sessions', // remove closed popups
 	);
 
 	!options.viewRoot && (options.viewRoot = options.chrome ? 'NativeExt.html' : 'NativeExt');

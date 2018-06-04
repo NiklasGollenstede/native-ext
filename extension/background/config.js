@@ -25,13 +25,15 @@ async function write() { let port; try {
 	catch (threw) { throw new Error(`The application is not installed correctly: ${ error && error.message || threw.message }`); }
 
 	// (try to) get the profile dir path
-	let dir = options.config.children.profile.children.value.value;
+	let dir = options.config.children.profile.children.path.value;
 	if (!dir && !options.config.children.profile.value) {
 		const magic = [1,2,3,4,].map(_=>Math.random().toString(32).slice(2)).join('');
-		(await Storage.local.set({ __magic__: magic, })); try {
+		(await Storage.local.set({ __magic__: magic, }));
+		(await new Promise(wake => setTimeout(wake, 2000))); // give the browser time to write ...
+		try {
 			dir = (await port.request('locateProfile', { magic, extId, }));
 		} finally { (await Storage.local.remove('__magic__')); }
-		dir && (options.config.children.profile.children.value.value = dir);
+		dir && (options.config.children.profile.children.path.value = dir);
 	}
 	if (!dir) { if (!options.config.children.profile.value) {
 		throw new Error(`Could not find browser profile, please set it manually`);
@@ -57,7 +59,7 @@ async function write() { let port; try {
 			(await process.require('node_modules/native-ext/test.node.js'));
 		}));
 	} catch (error) {
-		Native.setApplicationName('');
+		Native.setApplicationName(null);
 		throw new Error(`The configuration could not be verified, please make sure that the profile path is set correctly \n(${error.message})`);
 	}
 

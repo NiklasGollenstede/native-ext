@@ -10,6 +10,7 @@ const Self = new WeakMap;
 class Process {
 	constructor(options) { return new _Process(this, options); }
 	async require(id) { return Self.get(this).require(id); }
+	get alive() { return !!Self.get(this); }
 	destroy() { const self = Self.get(this); self && self.destroy(); }
 }
 setEventGetter(Process, 'stdout', Self);
@@ -66,18 +67,19 @@ class _Process {
 
 		// get (cached) remote refs or values
 		path = global.require.toUrl(path).replace(/(?:\.js)?$/, '.js').slice(rootUrl.length - 1);
-		let exports, resolve; const [ entries, ] = (await (this.cache[path] || (this.cache[path] = Promise.all([
-			new Promise(_=>(resolve=_)), this.port.request('require', path, null, (...args) => resolve(args)),
+		let resolve; const [ exports, ] = (await (this.cache[path] || (this.cache[path] = Promise.all([
+			new Promise(_=>(resolve=_)).then(entries => { // gets flattened Object.entries(exports)
+				if (entries.length === 1) { // non-object
+					return entries[0];
+				} else { // object properties, every second entry is a value that may be a remote function
+					const exports = { }; for (let i = 0; i < entries.length; i += 2) {
+						exports[entries[i]] = entries[i +1];
+					} return exports;
+				}
+			}),
+			this.port.request('require', path, null, (...args) => resolve(args)), // RPC can only return a single function, but the callback can receive multiple function arguments
 		]))));
-
-		// create a unique exports object
-		if (entries.length === 1) { // non-object
-			return entries[0];
-		} else { // object properties, every second entry is a value that may be a remote function
-			exports = { }; for (let i = 0; i < entries.length; i += 2) {
-				exports[entries[i]] = entries[i +1];
-			} return exports;
-		}
+		return exports;
 
 	} catch (error) {
 		throw this.port && this.port.error || error; // if something went wrong with the port, then that is the actual problem

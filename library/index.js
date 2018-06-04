@@ -2,12 +2,53 @@
 	'./manager',
 ], (Manager) => {
 
+/**
+ * Global `Manager` instance that keeps track of the profile specific native application `name`.
+ */
+const exports = Object.assign(new Manager({
+	/// automatically uses the saved application `name`, blocks indefinitely until `name` becomes known,
+	/// i.e. may never actually run anything if NativeExt is not set up.
+	getName: getApplicationName.bind(null, { blocking: true, }),
+	keepAlive: 20e3, /// kill the process 20 seconds after the last callback is removed and action completed.
+}), {
+	/**
+	 * Contacts the NativeExt extension to request permission for this extension to use the application.
+	 * @param  {string}  .message  A plain text message explaining to the user why this extension needs access.
+	 * @return {object}  Object { failed, code?, message?, name?, }. If `failed` is `false`, permission was granted
+	 *                   (now or already), and NativeExt is ready to use; `name` is set.
+	 *                   Otherwise, `failed` is `true`, `message` is set to an explanatory (English) string
+	 *                   and `code` is one of the following:
+	 *                    - `'dismissed'`: The user closed the prompt without making an explicit decision.
+	 *                    - `'denied'`: The user explicitly decided not to grant access.
+	 *                    - `'config-failed'`: The user granted access, but the application is not ready to use yet.
+	 *                                         Further configuration by the user is required.
+	 *                    - `'not-reachable'`: NativeExt extension could not be reached (not installed/enabled/started yet).
+	 */
+	requestPermission,
 
-const exports = Object.assign(
-	new Manager({ getName: getApplicationName, }),
-	{ requestPermission, removePermission, getApplicationName, setApplicationName, },
-);
+	/**
+	 * Retires the permission to use the application.
+	 * @return {object}  Object { failed, code?, message?, removed?, }. If `failed` is `false`, permission
+	 *                   is no longer granted. `removed` indicates whether a change was made.
+	 *                   Otherwise, `failed` is `true`, `message` is set to an explanatory (English) string
+	 *                   and `code` is one of the following:
+	 *                    - `'config-failed'`: The permission was removed in the extension, but the change
+	 *                                         could not be written to the configuration.
+	 *                    - `'not-reachable'`: NativeExt extension could not be reached (not installed/enabled/started yet).
+	 */
+	removePermission,
 
+	getApplicationName,
+	setApplicationName,
+
+	extensionInstallPage: browser => ({
+		edge: null, // TODO: publish
+		firefox: null, // TODO: publish
+		fennec: null, // TODO: publish
+		chrome: null, // TODO: publish
+		chromium: null, opera: null, vivaldi: null, // probably not
+	})[browser] || 'https://github.com/NiklasGollenstede/native-ext/releases',
+});
 
 const { runtime, } = (global.browser || global.chrome);
 
@@ -18,23 +59,41 @@ async function requestPermission({ message, }) {
 	return reply;
 }
 async function removePermission() {
+	setApplicationName(null);
 	return sendMessage({ request: 'removePermission', });
 }
 
 
-let appName;
-async function getApplicationName(force) {
-	if (!force) { try {
-		if (appName) { return appName; }
+let appName /* = undefined */; // cache and fallback for iDB
+let awaitName, gotName;
+async function getApplicationName(options) {
+	if (!options || options.stale !== false) { try {
+		if (appName !== undefined) { return appName; }
 		const name = (await (await getStore()).get('name'));
 		if (name) { return (appName = name); }
 	} catch (error) { console.error(error); } }
-	const reply = (await sendMessage({ request: 'getName', }));
-	const name = reply.name; if (!name) { throw new Error(`Failed to get native-ext app name`); }
+	let name; if (options && options.blocking) {
+		name = (await (awaitName = awaitName || new Promise(async got => {
+			gotName = got; let sleep = 500;
+			let name; while (!name) {
+				try { ({ name, } = (await sendMessage({ request: 'awaitName', }))); }
+				catch (error) { console.error(error); }
+				if (name && gotName) { gotName(name); gotName = null; }
+				if (!name) { (await new Promise(wake => setTimeout(wake, (sleep *= 2)))); }
+			}
+		})));
+	} else if (options && options.stale) {
+		return appName; // undefined
+	} else {
+		const reply = (await sendMessage({ request: 'getName', }));
+		name = reply.name; if (!name) { return null; }
+	}
 	setApplicationName(name); return name;
 }
 function setApplicationName(name) {
-	appName = name;
+	appName = name = name ? name +'' : null;
+	if (name && gotName) { gotName(name); gotName = null; }
+	if (!name && awaitName && !gotName) { awaitName = null; } // don't return the old name from the resolved promise
 	setTimeout(() => getStore().then(_=>_.set('name', name)));
 }
 
@@ -42,10 +101,10 @@ function setApplicationName(name) {
 async function sendMessage(message) { return new Promise((resolve, reject) => {
 	let error, left = extIds.length; extIds.forEach((extId, index) => runtime.sendMessage(
 		extId, message, { }, reply => { if (runtime.lastError) {
-			!index && (error = runtime.lastError); left -= 1; !left && reject(error);
+			index === 0 && (error = runtime.lastError); left -= 1; !left && reject(error);
 		} else { resolve(reply); } },
 	));
-}); }
+}).catch(error => ({ failed: true, code: 'not-reachable', message: `NativeExt is not installed or not enabled (${error.message})`, })); }
 const gecko = runtime.getURL('').startsWith('moz-');
 const extIds = gecko ? [ '@native-ext', '@native-ext-dev', ] : [ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ]; // TODO
 

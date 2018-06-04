@@ -5,41 +5,56 @@
 }) => {
 let debug; options.debug.whenChange(([ value, ]) => { debug = value; });
 
+const vExtensions = options.config.children.extensions.values;
+const vName = options.config.children.name.values;
+const wants = { __proto__: null, };
 
 async function onMessageExternal(message, sender) { switch (message.request) {
 	case 'requestPermission': {
-		const had = options.config.children.extensions.values.current.includes(sender.id); if (!had) {
-			const state = (await Prompt.requestPermission({ id: sender.id, message: sender.message, }));
+		const had = vExtensions.current.includes(sender); if (!had) {
+			const state = (await Prompt.requestPermission({ id: sender, message: message.message, }));
 			if (state !== 'allowed') { return { failed: true, code: state, message: 'Permission to use NativeExt was not granted', }; }
+			vExtensions.splice(Infinity, 0, sender);
+			wants[sender] && wants[sender].forEach(_=>_());
 		}
-		if (!had || !options.config.children.name.value) {
+		if (!had || !vName.get()) {
 			try { (await Config.write()); }
 			catch (error) { return { failed: true, code: 'config-failed', message: error.message, }; }
 		}
-		return { failed: false, name: options.config.children.name.value, };
+		return { failed: false, name: vName.get(), };
 	}
 	case 'removePermission': {
-		const index = options.config.children.extensions.values.current.indexOf(sender.id);
+		const index = vExtensions.current.indexOf(sender);
 		if (index < 0) { return { failed: false, removed: false, }; }
-		options.config.children.extensions.values.splice(index, 1);
+		vExtensions.splice(index, 1);
 		try { (await Config.write()); }
 		catch (error) { return { failed: true, code: 'config-failed', message: error.message, }; }
 		return { failed: false, removed: true, };
 	}
 	case 'getName': {
-		if (!options.config.children.extensions.values.current.includes(sender.id)) {
+		if (!vExtensions.current.includes(sender)) {
 			return { failed: true, code: 'denied', message: 'This extension is not currently allowed to use NativeExt', };
 		}
-		const name = options.config.children.name.value;
+		const name = vName.get();
 		if (!name) { return { failed: true, code: 'not-setup', message: 'NativeExt is not installed and configured correctly', }; }
+		return { failed: false, name, };
+	}
+	case 'awaitName': {
+		if (!vExtensions.current.includes(sender)) {
+			(await new Promise(got => (wants[sender] || (wants[sender] = [ ])).push(got)));
+		}
+		const name = vName.get() || (await new Promise(got => vName.parent.onChange(function done() {
+			if (vName.isSet) { vName.parent.onChange.removeListener(done); got(vName.get()); }
+		})));
 		return { failed: false, name, };
 	}
 	default: throw new Error(`Unknown request ${message.request}`);
 } }
 
-Runtime.onMessageExternal.addListener(async (message, sender, reply) => {
-	try { reply((await onMessageExternal(message, sender))); }
-	catch (error) { reply({ failed: true, code: 'unexpected', error: error.message, }); }
-});
+Runtime.onMessageExternal.addListener((message, sender, reply) => { {
+	debug && console.info('onMessageExternal', sender.id, message);
+	onMessageExternal(message, sender.id).then(reply)
+	.catch(error => reply({ failed: true, code: 'unexpected', error: error.message, }));
+} return true; });
 
 }); })(this);

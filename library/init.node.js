@@ -18,6 +18,6 @@ port.addHandlers({
 });
 
 port.post('ready');
-console.info('native-ext running in', process.cwd());
+// console.info('native-ext running in', process.cwd());
 
 };

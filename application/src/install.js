@@ -27,8 +27,8 @@ const installDir = (windows ? process.env.APPDATA +'\\' : require('os').homedir(
 
 const outPath = (...path) => Path.resolve(installDir, ...path);
 const bin = outPath(`bin/${version}/${fullName}`) + (windows && !unpacked ? '.exe' : '');
-const exec = (...args) => (windows ? '@echo off\r\n\r\n' : '#!/bin/bash\n\n')
-+ args.map(s => (/^(?:%[*\d]|\$[@\d]|[\w-]+)$/).test(s) ? s : JSON.stringify(s)).join(' ');
+const script = (...args) => (windows ? '@echo off\r\n\r\n' : '#!/bin/bash\n\n')
++ args.map(s => (/^(?:%[*\d]|\$[@\d]|[\w/-]+)$/).test(s) ? s : windows ? `"${s}"` : JSON.stringify(s)).join(' ');
 
 async function install() {
 
@@ -39,7 +39,7 @@ async function install() {
 	(await Promise.all([
 
 		...(unpacked ? [
-			replaceFile(outPath('bin', 'latest'+ scriptExt), exec(
+			replaceFile(outPath('bin', 'latest'+ scriptExt), script(
 				process.argv[0], process.argv[1],
 				...(nodeOptions ? nodeOptions.slice(15).split(',') : [ ]),
 				windows ? '%*' : '$@',
@@ -48,7 +48,7 @@ async function install() {
 			copyFile(bin, source).then(() => chmod(bin, '754')),
 			readFile(Path.join(__dirname, '../node_modules/ref/build/Release/binding.node'))     .then(data => replaceFile(outPath(bin +'/../ref.node'), data)), // copyFile doesn't work
 			readFile(Path.join(__dirname, '../node_modules/ffi/build/Release/ffi_bindings.node')).then(data => replaceFile(outPath(bin +'/../ffi.node'), data)), // copyFile doesn't work
-			replaceFile(outPath('bin', 'latest'+ scriptExt), exec(bin, windows ? '%*' : '$@'), { mode: '754', }),
+			replaceFile(outPath('bin', 'latest'+ scriptExt), script(bin, windows ? '%*' : '$@'), { mode: '754', }),
 		]),
 
 		!windows && writeProfile({ bin, browser: 'chromium', dir: '', ids: [ /* TBD */ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ], }),
@@ -78,29 +78,37 @@ async function writeProfile({ browser, dir, ids = [ ], locations, }) {
 		browser, profile: dir, locations: typeof locations === 'object' && locations || { },
 	};
 
+	const link = windows ? (browser === 'firefox'
+		? 'HKCU\\Software\\Mozilla\\NativeMessagingHosts\\' : 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\'
+	) + name
+	: outPath((linux ? {
+		chromium: '../.config/chromium/NativeMessagingHosts',
+		chrome: '../.config/google-chrome/NativeMessagingHosts',
+		firefox: '../.mozilla/native-messaging-hosts',
+	} : {
+		chromium: '../Chromium/NativeMessagingHosts',
+		chrome: '../Google/Chrome/NativeMessagingHosts',
+		firefox: '../Mozilla/NativeMessagingHosts',
+	})[browser], name +'.json');
+
 	(await Promise.all([
 
 		replaceFile(target +'manifest.json', JSON.stringify(manifest,  null, '\t'), 'utf8'),
 		replaceFile(target +'config.json', JSON.stringify(config,  null, '\t'), 'utf8'),
-		replaceFile(target + packageJson.name + scriptExt, exec(
+		replaceFile(target + packageJson.name + scriptExt, script(
 			outPath('bin', 'latest'+ scriptExt),
 			!dir ? 'config' : 'connect',
 			target +'config.json',
 			windows ? '%*' : '$@',
 		), { mode: '754', }),
 
-		windows ? execute('REG', 'ADD', (browser === 'firefox'
-			? 'HKCU\\Software\\Mozilla\\NativeMessagingHosts\\' : 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\'
-		) + name, '/ve', '/t', 'REG_SZ', '/d', target +'manifest.json', '/f')
-		: replaceLink(target +'manifest.json', outPath((linux ? {
-			chromium: '../.config/chromium/NativeMessagingHosts',
-			chrome: '../.config/google-chrome/NativeMessagingHosts',
-			firefox: '../.mozilla/native-messaging-hosts',
-		} : {
-			chromium: '../Chromium/NativeMessagingHosts',
-			chrome: '../Google/Chrome/NativeMessagingHosts',
-			firefox: '../Mozilla/NativeMessagingHosts',
-		})[browser], name +'.json')),
+		windows ? execute('REG', 'ADD', link, '/ve', '/t', 'REG_SZ', '/d', target +'manifest.json', '/f')
+		: replaceLink(target +'manifest.json', link),
+
+		replaceFile(target +'unlink'+ scriptExt, script(...(
+			windows ? [ 'REG', 'DELETE', link, '/ve', '/f', ]
+			: [ 'rm', '-f', link, ]
+		))),
 
 	]));
 

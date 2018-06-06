@@ -8,16 +8,13 @@ const Native = await require.async('node_modules/native-ext/');
 ```
 
 The browser API of native-ext currently requires [`web-ext-utils`](https://github.com/NiklasGollenstede/web-ext-utils) as a peer-dependency.
-At least the files
- * `node_modules/web-ext-utils/browser/index.js`
- * [`node_modules/web-ext-utils/lib/multiport/index.js`](https://github.com/NiklasGollenstede/multiport)
- * [`node_modules/web-ext-utils/lib/pbq/require.js`](https://github.com/NiklasGollenstede/pbq/blob/master/require.js)
+At least the file
  * `node_modules/web-ext-utils/utils/event.js`
 
-must be loadable. The `require` above is the global value set by `pbq/require.js`.
+must be loadable. The `require` above is the global value set by `pbq/require.js`, but other AMD loaders should work as well.
 
 
-# API
+# API -- OUTDATED
 
 ```js
 async function require(path, { onDisconnect, } = { }) { return exports; }

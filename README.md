@@ -8,33 +8,33 @@ This application enables browser extensions/add-ons to be truly awesome (again).
 
 ### Installation
 
-1. **Download**: Unless you know that you need a specific version, get the latest (topmost) version matching your operating system from the [releases page](https://github.com/NiklasGollenstede/native-ext/releases).\
-Alternatively, you can [build NativeExt](#building) yourself.
-2. **Installation**: Just double-click (run/open) the downloaded file. It should not require elevated privileges of any kind. After a few seconds, you should see a success message.
-3. **Extension registration**: For the browsers to allow the communication between your extensions and NativeExt, the extensions need to be registered. If the extension in question provided you with an registration script, run that and you are done.\
-*Otherwise*:
-	(a) Open the installation directory, which is `%APPDATA%\de.niklasg.native_ext` on Windows, `~/.de.niklasg.native_ext` on Linux and `~/Library/Application Support/de.niklasg.native_ext` on macOS.
-	(b) Create a file in the `vendors/` subdir as described in the [registration files](#registration-files) section below.
-	(c) Run the `refresh.bat`/`refresh.sh` file in the installation directory.
+Get the extension for your browser(s):
+
+ * Chrome: TBA
+ * Firefox: TBA
+
+Then follow the (short) instructions on the options page to install and connect the application.
 
 ### Update
 
-Version compatibility has a hight priority for the NativeExt application; extension updates should only very rarely, if ever, require an update of NativeExt.
-To update, close all running instances of NativeExt (by closing all browsers or disabling all extensions that use it, or simply by killing all it's processes) and do a normal installation.
-
+The extension is automatically updated by the browser and should take care of everything else.
 
 ### Uninstallation
 
-If you want to unregister an extension, delete its registration file from the `/vendors/` directory, then run the refresh script again.
-
-To completely uninstall NativeExt, run the `uninstall.sh` script in the installation directory (see above). On windows, call the installer with `uninstall` as first argument or simply delete the installation directory.
+The extension can be removed like any other extension.
+There is no automated uninstallation for the application yet. The application is installed in the home folder, specifically in `%APPDATA%\de.niklasg.native_ext` on Windows, `~/.de.niklasg.native_ext` on Linux and `~/Library/Application Support/de.niklasg.native_ext` on macOS.
+Besides the files in that folder, each configuration in `profiles/` is linked elsewhere so that the browser can find it. There is a `unlink` script in every configuration folder.
+To remove NativeExt without traces, call all those `unlink` scripts and delete the installation/configuration folder.
 
 
 ## For developers
 
 This package tries to solve a problem that arises with the deprecation of classical Add-Ons in Firefox.\
-From Firefox version 57 onward (November 2017), Firefox will only support "WebExtensions", which are very similar to the extensions running in Chrome, other Chromium based browsers and even Microsoft Edge.\
-While Firefox Add-ons could previously dig very deep into the Firefox code, capable of changing nearly every aspect of the browser, and even do binary system calls, this is no longer possible with WebExtensions. They can only access normal web APIs (XHR, IndexedDB, ...) and a set of APIs in the `browser`/`chrome` namespace explicitly  designed for them. This means that browser extensions can now only do things that are, at least to a certain extend, intended by the browser vendors. Many innovative things that could previously be implemented in Firefox Add-Ons are no longer possible.\
+From Firefox version 57 onwards (November 2017), Firefox only supports "WebExtensions", which are very similar to the extensions running in Chrome, other Chromium based browsers and even Microsoft Edge.\
+While Firefox Add-ons could previously dig very deep into the Firefox code, capable of changing nearly every aspect of the browser, and even doing binary system calls, this is no longer possible with WebExtensions.
+They can only access normal web APIs (XHR, IndexedDB, ...) and a set of APIs in the `browser`/`chrome` namespace explicitly  designed for them.
+This means that browser extensions can now only do things that are, at least to a certain extend, intended by the browser vendors.
+Many innovative things that could previously be implemented in Firefox Add-Ons are no longer possible.\
 The only way (partially) around this is to use "Native Messaging": WebExtensions in Chrome and Firefox can send JSON-messages to native applications running on the host system — if the target applications are explicitly designed for it.
 
 ### The Problem
@@ -47,45 +47,48 @@ The problem with the Native Messaging approach is twofold. Where it was previous
 
 It seems that there is no way around Native Messaging. If you want to implement functionality that exceeds the APIs provided by the Browser, it is the only way forward.\
 Therefore, both developing and installing and updating the native applications needs to be as easy as possible, to lower the barrier to entry for developers and users.\
-This software aims to do that. Once everything is implemented as intended, the development - deploy - update cycle should be as follows:
+The NativeExt framework provides a very simple work flow for both developers and users:
 
-- The developer can include node.js modules in the extension package
-	- the script modules are written in same language as the rest of the extension
-- The user installs this free and open software with as few clicks as possible
-	- this only needs to be done once
-	- since this software has no own functionality and the protocol is simple, no updates should be necessary (once the API is finalized)
-- The extension prompts the user to download and run a very short and simple script that registers the extension with this software
-	- the script places a file with its extension IDs in a predefined directory and calls a refresh script (writing the IDs is technically necessary)
-	- scripts are so generic that they can be generated automatically, users who don't trust the scripts can perform their actions manually in about 30 seconds, see [Installation](#installation)
-- The extension can now contact this software without further user interaction
-	- NativeExt locates the extension installation and makes the included node.js modules available to be executed it's slightly modified node.js process
-	- to update the "native application", it is enough to update the extension with new node.js modules
-	- this way, the versions of the extension and the native application always match
+**User** install the NativeExt extension and follow simple and short instructions to install and connect the native application endpoint. Once installed, the extension and application update themselves. Allowing extensions to use NativeExt only requires a single click; all configuration is written automatically.
+
+**Developers** have two choices, they can either use the bare-bone connection and communication protocols of NativeExt directly, or they can use the library included in this project.
+Extensions have to ask the user for permission and can then load any node.js modules they wish.
+Everything except the most basic code to initialize the node.js process is included in the extensions themselves, so software components are always updated in the browser and node.js parts of extensions at the same time: when the extension receives its update through the normal browser update mechanism.
 
 ### Implementation status
 
-Building, installation and connecting from Chrome and Firefox works on Windows, Linux and macOS.\
-The API for the connection establishment and the modifications of the node.js environment are not finalized.
+Mostly done. Outstanding work:
 
+ * Publish extension in the stores of Chrome and Firefox
+ * Update node.js from version 8.3 to ... (10.x ?)
+ * Update dependencies and hand-puck them for the `package-lock.json`
+ * Support for Edge, Opera, Vivaldi, ...
+ * Write an uninstaller
 
-### [API](./api/README.md)
+### [API](./docs/README.md)
 
 
 ### Example
 
-The API is not finalized and may be subject to breaking changes.
-One part that is unlikely to change is the usage of [Multiport](https://github.com/NiklasGollenstede/multiport) for the communication.
+An example using the library:
 
 ```js
 const Native = await require.async('node_modules/native-ext/');
 
-const fs = await Native.require(require.resolve('./fs.node.js'));
+await Native.requestPermission({ message: 'Wanna do great stuff', });
+// assume the NativeExt extension is set up and the user grants permission right away
 
-const file = await fs.readFile(somePath, 'utf8');
+const file = await Native.do(process => { // keep process alive until this function exits
 
-fs.watch(someOtherPath, { }, onChange); // can even send callbacks
+	const fs = await Native.require(require.resolve('./fs.node.js'));
+	const file = await fs.readFile(somePath, 'utf8');
 
-later(() => fs.unwatch(onChange)); // remove listener after the connection closed
+	fs.watch(someOtherPath, { }, onChange); // can even send callbacks
+	await waitSomeTime();
+	fs.unwatch(onChange); // remove listener after the connection closed
+
+	return file;
+});
 
 function onChange(type, name) {
 	console.log('File', name, type +'d');
@@ -116,27 +119,6 @@ fs.unwatch = callback => {
 module.exports = fs;
 ```
 
-### Registration files
-
-Browsers only allow extensions to connect to native applications it the extensions id is listed in the native messaging manifest of the application.
-NativeExt can automatically update its manifest, but the ids of the allowed extensions must be known. To register an extension, place a JSON file of the following format (but without the comments) in the `/vandors/` directory in NativeExts installation directory.
-```json5
-{
-	// list of chrome extension URL-prefixes, starting with `chrome-extension://` and ending with a `/` after the id
-	"chrome-ext-urls": [
-		// these ids are only constant for extensions hosted in the chrome store
-		// otherwise, they are different for every (development mode) installation of the extension
-		"chrome-extension://abcdefghijklmnopabcdefghijklmnop/"
-	],
-	// list of Firefox WebExtension application ids, they always contain an @ symbol
-	"firefox-ext-ids": [
-		"@extension-id" // you must set this in the "applications" entry in your extensions manifest.json
-	]
-}
-
-```
-The name of your file should be your extensions name/id/domain or that of its developing organization and should probably not contain spaces.
-
 
 ### Extension location
 
@@ -153,7 +135,11 @@ There are several supported ways to do this:
 
 ### Building
 
-Building NativeExt requires node.js in the exact version listed in the `package.json`/`"scripts"`.`"build"` command (currently 8.3), npm and [node-gyp](https://github.com/nodejs/node-gyp#installation) including its dependencies. After cloning or downloading the sources, install the dependencies with:
+This project contains three sub-projects: the application itself, the extension that manages it, and the library for other extensions to work with the former two.
+
+#### Building (application)
+
+Building the NativeExt application requires node.js in the exact version listed in the `package.json`/`"scripts"`.`"build"` command (currently 8.3), npm and [node-gyp](https://github.com/nodejs/node-gyp#installation) including its dependencies. After cloning or downloading the sources, step in the `application` directory and install the dependencies with:
 
 `npm install`
 
@@ -167,12 +153,21 @@ build only for your current system:
 
 or for all supported platforms:
 
-`npm run build-all` (these will not work with Chrome or extensions that rely on `ffi`, which needs to be build explicitly for each platform)
+`npm run build-all` (these will not work with Chrome or extensions that rely on `ffi`, which needs to be build explicitly for each platform).
 
 The builds will be placed in the `/release` folder.
 
+#### Build (library)
 
-### Extension debugging
+The library does not need to be build, but is needs to be linked for the extension. Prepare that by stepping in the `library` directory and running:
+
+`npm link`
+
+#### Build (extension)
+
+Step in the `extension` directory and install and build with `npm install`. use `npm start` to re-build.
+
+### Debugging
 
 To be able to attach an inspector to the native process, install from sources and add `--node-options=--inspect` or `--node-options=--inspect-brk` as install argument. E.g.:
 

@@ -21,7 +21,7 @@ if (config.locations && (extId in config.locations)) {
 	if (browser.name === 'firefox') {
 		const path = Path.join(browser.profileDir, 'extensions', extId); let stat;
 		try { stat = FS.statSync(path +'.xpi'); } catch (_) { }
-		if (stat && stat.isFile()) { browser.extFile = path; }
+		if (stat && stat.isFile()) { browser.extFile = path +'.xpi'; }
 		else {
 			try { stat = FS.statSync(path); } catch (_) { }
 			if (stat && stat.isDirectory()) { browser.extDir = path; }

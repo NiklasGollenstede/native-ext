@@ -18,7 +18,6 @@ const unpacked = !process.versions.pkg;
 const packageJson = require('../package.json'), { version, } = packageJson;
 const fullName = packageJson.fullName.replace(/^\W|[^\w.]|\W$/g, '_'); // must match /^\w[\w.]*\w$/
 const source = unpacked ? __dirname : process.argv[0]; // location of packed executable or project root
-// try { source = require.resolve(source); } catch (_) { } node && (source = Path.resolve(source, '..')); // TODO: ??
 
 const nodeOptions = process.argv.find(_=>_.startsWith('--node-options='));
 const windows = process.platform === 'win32', linux = process.platform === 'linux', macos = process.platform === 'darwin';
@@ -40,8 +39,9 @@ async function install() {
 
 		...(unpacked ? [
 			replaceFile(outPath('bin', 'latest'+ scriptExt), script(
-				process.argv[0], process.argv[1],
+				process.argv[0],
 				...(nodeOptions ? nodeOptions.slice(15).split(',') : [ ]),
+				process.argv[1],
 				windows ? '%*' : '$@',
 			), { mode: '754', }),
 		] : [
@@ -51,9 +51,9 @@ async function install() {
 			replaceFile(outPath('bin', 'latest'+ scriptExt), script(bin, windows ? '%*' : '$@'), { mode: '754', }),
 		]),
 
-		!windows && writeProfile({ bin, browser: 'chromium', dir: '', ids: [ /* TBD */ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ], }),
-		writeProfile({ bin, browser: 'chrome', dir: '', ids: [ /* TBD */ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ], }),
-		writeProfile({ bin, browser: 'firefox', dir: '', ids: [ '@'+ packageJson.name, ], }),
+		!windows && writeProfile({ bin, browser: 'chromium', dir: '', }),
+		writeProfile({ bin, browser: 'chrome', dir: '', }),
+		writeProfile({ bin, browser: 'firefox', dir: '', }),
 
 		// no uninstallation yet
 	]));
@@ -66,7 +66,10 @@ async function writeProfile({ browser, dir, ids = [ ], locations, }) {
 	const name = fullName +'.'+ profile;
 	const target = outPath('profiles', profile) + Path.sep;
 
-	!Array.isArray(ids) && (ids = [ ]);
+	ids = Array.from(new Set(browser === 'firefox'
+		? [ '@'+ packageJson.name, '@'+ packageJson.name +'-dev', ...(ids || [ ]), ]
+		: [ /* TBD */ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ...(ids || [ ]), ]
+	));
 	const manifest = {
 		name, description: `WebExtensions native connector (${browser}:${dir})`,
 		path: target + packageJson.name + scriptExt,
@@ -106,7 +109,7 @@ async function writeProfile({ browser, dir, ids = [ ], locations, }) {
 		: replaceLink(target +'manifest.json', link),
 
 		replaceFile(target +'unlink'+ scriptExt, script(...(
-			windows ? [ 'REG', 'DELETE', link, '/ve', '/f', ]
+			windows ? [ 'REG', 'DELETE', link, '/ve', '/f', ] // TODO: delete the entire node, not just the default key
 			: [ 'rm', '-f', link, ]
 		))),
 

@@ -42,7 +42,7 @@ async function write() { let port; try {
 	} }
 
 	// read th configuration values
-	const ids = [ extId, ].concat(options.config.children.extensions.values.current);
+	const ids = options.config.children.extensions.values.current;
 	const locations = options.config.children.external.values.current
 	.reduce((o, [ k, v, ]) => ((o[k] = v), o), { });
 

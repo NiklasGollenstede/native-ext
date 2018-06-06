@@ -19,12 +19,12 @@ module.exports = function({ options, /*packageJson,*/ manifestJson, files, }) {
 
 	// TODO: only include necessary files
 	files.node_modules = [
+		'multiport/index.js',
 		'native-ext/index.js',
 		'native-ext/init.node.js',
 		'native-ext/manager.js',
 		'native-ext/process.js',
 		'native-ext/test.node.js',
-		'multiport/index.js',
 		'pbq/require.js',
 		'web-ext-utils/browser/index.js',
 		'web-ext-utils/browser/storage.js',
@@ -36,7 +36,6 @@ module.exports = function({ options, /*packageJson,*/ manifestJson, files, }) {
 		'web-ext-utils/loader/views.js',
 		'web-ext-utils/options/editor/about.css',
 		'web-ext-utils/options/editor/about.js',
-		'web-ext-utils/options/editor/dark.css',
 		'web-ext-utils/options/editor/index.css',
 		'web-ext-utils/options/editor/index.js',
 		'web-ext-utils/options/editor/inline.css',
@@ -48,7 +47,7 @@ module.exports = function({ options, /*packageJson,*/ manifestJson, files, }) {
 		'web-ext-utils/utils/icons/',
 		'web-ext-utils/utils/event.js',
 		'web-ext-utils/utils/files.js',
-		'web-ext-utils/utils/index.js',
+		'web-ext-utils/utils/notify.js',
 		'web-ext-utils/utils/semver.js',
 	];
 

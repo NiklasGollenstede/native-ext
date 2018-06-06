@@ -5,6 +5,7 @@
 	require,
 }) => {
 
+// this is just a proof of concept how to use the global process manager
 async function update() {
 	Native.setApplicationName(options.config.children.name.value);
 
@@ -20,7 +21,7 @@ async function update() {
 	catch (_) { console.info('threw as expected'); }
 }
 
-// this is just a proof of concept how to use the `Process` class
+// this is just a proof of concept how to use the `Process` class directly
 async function updateOld() { let process; try {
 
 	process = (await new Process({

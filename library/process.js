@@ -5,14 +5,13 @@
 ], (
 	{ setEventGetter, }, Port, require,
 ) => {
-const Self = new WeakMap;
 
 class Process {
 	constructor(options) { return new _Process(this, options); }
 	async require(id) { return Self.get(this).require(id); }
 	get alive() { return !!Self.get(this); }
 	destroy() { const self = Self.get(this); self && self.destroy(); }
-}
+} const Self = new WeakMap;
 setEventGetter(Process, 'stdout', Self);
 setEventGetter(Process, 'stderr', Self);
 setEventGetter(Process, 'uncaught', Self);

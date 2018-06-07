@@ -17,7 +17,7 @@ const execute = (bin, ...args) => new Promise((resolve, reject) => child_process
 const unpacked = !process.versions.pkg;
 const packageJson = require('../package.json'), { version, } = packageJson;
 const fullName = packageJson.fullName.replace(/^\W|[^\w.]|\W$/g, '_'); // must match /^\w[\w.]*\w$/
-const source = unpacked ? __dirname : process.argv[0]; // location of packed executable or project root
+const source = Path.normalize(unpacked ? __dirname : process.argv[0]); // location of packed executable or project root
 
 const nodeOptions = process.argv.find(_=>_.startsWith('--node-options='));
 const windows = process.platform === 'win32', linux = process.platform === 'linux', macos = process.platform === 'darwin';
@@ -25,15 +25,16 @@ const scriptExt = windows ? '.bat' : '.sh';
 const installDir = (windows ? process.env.APPDATA +'\\' : require('os').homedir() + (macos ? '/Library/Application Support/' : '/.')) + fullName;
 
 const outPath = (...path) => Path.resolve(installDir, ...path);
-const bin = outPath(`bin/${version}/${fullName}`) + (windows && !unpacked ? '.exe' : '');
+const bin = outPath(`bin/${version}/${packageJson.name}`) + (windows && !unpacked ? '.exe' : '');
+
 const script = (...args) => (windows ? '@echo off\r\n\r\n' : '#!/bin/bash\n\n')
 + args.map(s => (/^(?:%[*\d]|\$[@\d]|[\w/-]+)$/).test(s) ? s : windows ? `"${s}"` : JSON.stringify(s)).join(' ');
 
 async function install() {
 
-	try { (await unlink(bin)); } catch (error) { if (error.code !== 'ENOENT') {
+	if (!unpacked && source !== bin) { try { (await unlink(bin)); } catch (error) { if (error.code !== 'ENOENT') {
 		throw error.code === 'EBUSY' ? new Error(`A file in the installation folder "${ outPath('') }" seems to be open. Please close all browsers and try again.`) : error;
-	} }
+	} } }
 
 	(await Promise.all([
 
@@ -45,31 +46,35 @@ async function install() {
 				windows ? '%*' : '$@',
 			), { mode: '754', }),
 		] : [
-			copyFile(bin, source).then(() => chmod(bin, '754')),
+			source !== bin && copyFile(bin, source).then(() => chmod(bin, '754')),
 			readFile(Path.join(__dirname, '../node_modules/ref/build/Release/binding.node'))     .then(data => replaceFile(outPath(bin +'/../ref.node'), data)), // copyFile doesn't work
 			readFile(Path.join(__dirname, '../node_modules/ffi/build/Release/ffi_bindings.node')).then(data => replaceFile(outPath(bin +'/../ffi.node'), data)), // copyFile doesn't work
 			replaceFile(outPath('bin', 'latest'+ scriptExt), script(bin, windows ? '%*' : '$@'), { mode: '754', }),
 		]),
 
 		!windows && writeProfile({ bin, browser: 'chromium', dir: '', }),
-		writeProfile({ bin, browser: 'chrome', dir: '', }),
-		writeProfile({ bin, browser: 'firefox', dir: '', }),
+		writeProfile({ browser: 'chrome', dir: '', }),
+		writeProfile({ browser: 'firefox', dir: '', }),
 
 		// no uninstallation yet
 	]));
 
 }
 
-async function writeProfile({ browser, dir, ids = [ ], locations, }) {
+async function writeProfile({ browser, dir, ids, locations, }) {
 
 	const profile = !dir ? browser : crypto.createHash('sha1').update(dir).digest('hex').slice(-16).padStart(16, '0');
 	const name = fullName +'.'+ profile;
 	const target = outPath('profiles', profile) + Path.sep;
 
-	ids = Array.from(new Set(browser === 'firefox'
-		? [ '@'+ packageJson.name, '@'+ packageJson.name +'-dev', ...(ids || [ ]), ]
-		: [ 'kfabpijabfmojngneeaipepnbnlpkgcf', ...(ids || [ ]), ]
-	));
+	const defaultIds = browser === 'firefox'
+	? [ '@'+ packageJson.name, '@'+ packageJson.name +'-dev', ]
+	: [ 'kfabpijabfmojngneeaipepnbnlpkgcf', ];
+
+	ids = Array.from(new Set(Array.isArray(ids) ? defaultIds.concat(ids) : defaultIds));
+	locations = typeof locations === 'object' && !Array.isArray(locations) && locations || { };
+	unpacked && defaultIds.forEach(id => (locations[id] = Path.resolve(__dirname, '../../extension/build/')));
+
 	const manifest = {
 		name, description: `WebExtensions native connector (${browser}:${dir})`,
 		path: target + packageJson.name + scriptExt,

@@ -1,5 +1,5 @@
 (function(global) { 'use strict'; define(async ({ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
-	'node_modules/web-ext-utils/browser/': { Runtime, Windows, },
+	'node_modules/web-ext-utils/browser/': { Runtime, Windows, isGecko, },
 	'node_modules/web-ext-utils/loader/views': Views,
 	'common/options': options,
 }) => {
@@ -29,7 +29,7 @@ async function requestPermission({ id, message, }) {
 	<div id=main>
 		<img class=icon src="/icon.svg">
 		<h3>Allow <em class=id></em> to access your computer?</h3>
-		<p>The extension <em class=id></em> has requested to use NativeExt.<br>
+		<p>The extension <span class=chrome>with the id </span><em class=id></em> has requested to use NativeExt.<br>
 		Granting this request will give it <b>full access</b> to your computer, including all files of your user account.<p>
 		<p>It claims it needs this for the following reason:</p>
 		<quote id=message></quote>
@@ -43,6 +43,8 @@ async function requestPermission({ id, message, }) {
 	</div>`;
 	setTimeout(() => document.body.insertAdjacentHTML('beforeend', `<style> * { transition: background .16s linear; } </style>`), 16);
 
+	!isGecko && (id = id.replace(/\w{4}/g, s => '\u00AD'+ s).slice(1));
+	isGecko && document.querySelectorAll('.chrome').forEach(_=>(_.style.display = 'none'));
 	document.querySelectorAll('.id').forEach(_=>(_.textContent = id));
 	document.querySelector('#message').textContent = message;
 	if (!options.config.children.name.value) {

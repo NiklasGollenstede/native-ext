@@ -11,8 +11,8 @@ This application enables browser extensions/add-ons to be truly awesome (again).
 
 Get the extension for your browser(s):
 
- * Chrome: <sub><a href="https://chrome.google.com/webstore/detail/nativeext/kfabpijabfmojngneeaipepnbnlpkgcf/"><img src="./resources/get-chrome-ext-206x58" width="103" height="29"></a><sub>
- * Firefox: <sub><a href="https://addons.mozilla.org/firefox/addon/native-ext/"><img src="./resources/get-firefox-ext-172x60.png" width="86" height="30"></a><sub>
+ * Firefox: <sub><sub><sub><sub><sub><a href="https://addons.mozilla.org/firefox/addon/native-ext/"><img src="./resources/get-firefox-ext-172x60.png" width="86" height="30"></a></sub></sub></sub></sub></sub>
+ * Chrome: <sub><sub><sub><sub><sub><a href="https://chrome.google.com/webstore/detail/nativeext/kfabpijabfmojngneeaipepnbnlpkgcf/"><img src="./resources/get-chrome-ext-206x58.png" width="103" height="29"></a></sub></sub></sub></sub></sub>
 
 Then follow the (short) instructions on the options page to install and connect the application.
 
@@ -70,9 +70,8 @@ Everything except the most basic code to initialize the node.js process is inclu
 
 Mostly done. Outstanding work:
 
- * Publish extension in the stores of Chrome and Firefox
  * Update node.js from version 8.3 to ... (10.x ?)
- * Update dependencies and hand-puck them for the `package-lock.json`
+ * Update dependencies and hand-pick them for the `package-lock.json`
  * Support for Edge, Opera, Vivaldi, ...
  * Write an uninstaller
 

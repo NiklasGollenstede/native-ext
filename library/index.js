@@ -107,7 +107,7 @@ async function sendMessage(message) { return new Promise((resolve, reject) => {
 	));
 }).catch(error => ({ failed: true, code: 'not-reachable', message: `NativeExt is not installed or not enabled (${error.message})`, })); }
 const gecko = runtime.getURL('').startsWith('moz-');
-const extIds = gecko ? [ '@native-ext', '@native-ext-dev', ] : [ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ]; // TODO
+const extIds = gecko ? [ '@native-ext', '@native-ext-dev', ] : [ 'kfabpijabfmojngneeaipepnbnlpkgcf', ];
 
 
 let gettingDB; async function getStore() { return gettingDB || (gettingDB = (async () => {

@@ -74,6 +74,17 @@ const model = {
 			version: { default: '', restrict: { type: 'string', }, },
 		},
 	},
+	internal: {
+		title: 'Internal',
+		expanded: false,
+		hidden: !isBeta,
+		description: `Proceed at your own risk`,
+		default: true,
+		children: {
+			os: { default: os, },
+			arch: { default: arch, },
+		},
+	},
 	debug: {
 		title: 'Debug Level',
 		expanded: false,

@@ -1,7 +1,7 @@
 (function(global) { 'use strict'; define(async ({ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 	'node_modules/web-ext-utils/browser/': { Runtime, },
 	'common/options': options,
-	Config, Prompt,
+	require, // loads ./config and ./prompt lazily
 }) => {
 let debug; options.debug.whenChange(([ value, ]) => { debug = value; });
 
@@ -12,13 +12,13 @@ const wants = { __proto__: null, };
 async function onMessageExternal(message, sender) { switch (message.request) {
 	case 'requestPermission': {
 		const had = vExtensions.current.includes(sender); if (!had) {
-			const state = (await Prompt.requestPermission({ id: sender, message: message.message, }));
+			const state = (await (await require.async('./prompt')).requestPermission({ id: sender, message: message.message, }));
 			if (state !== 'allowed') { return { failed: true, code: state, message: 'Permission to use NativeExt was not granted', }; }
 			vExtensions.splice(Infinity, 0, sender);
 			wants[sender] && wants[sender].forEach(_=>_());
 		}
 		if (!had || !vName.get()) {
-			try { (await Config.write()); }
+			try { (await (await require.async('./config')).write()); }
 			catch (error) { return { failed: true, code: 'config-failed', message: error.message, }; }
 		}
 		return { failed: false, name: vName.get(), };
@@ -27,7 +27,7 @@ async function onMessageExternal(message, sender) { switch (message.request) {
 		const index = vExtensions.current.indexOf(sender);
 		if (index < 0) { return { failed: false, removed: false, }; }
 		vExtensions.splice(index, 1);
-		try { (await Config.write()); }
+		try { (await (await require.async('./config')).write()); }
 		catch (error) { return { failed: true, code: 'config-failed', message: error.message, }; }
 		return { failed: false, removed: true, };
 	}

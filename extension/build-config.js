@@ -9,6 +9,8 @@ module.exports = function({ options, /*packageJson,*/ manifestJson, files, }) {
 		'sessions', // remove closed popups
 	);
 
+	options.chrome && (manifestJson.key = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAg6wrLIc0wvAyq94OpBt/7vvo9xpwJIuMdwevaW1oc/SXdRwHbS9ViGn/1g8DjJGscYA8uKxc016QRPeBro/lB/dY+frID/bsBOAoKYhesT6nyY2UooGu3BGIDp7vLU+duhQB1mAgsoraiTcW9siU3uReiIVf/tsD/ksrZt8j/B/EaOUZoUULWxaPToJBGRvMbY1wu+7vvFLlFhUhM8qUjUJgHv/l4aP5gNuTjP+5xtltqnXt0QTCgkfsTGgo0dVu9ilAm4orDdnVA8eAyh6GlQFV8yQouyKkWZpiM329lNWF4GZ+olPWDqnd+ffznzS68fB0RC3ujIBOD5MuhyxW0wIDAQAB');
+
 	!options.viewRoot && (options.viewRoot = options.chrome ? 'NativeExt.html' : 'NativeExt');
 
 	manifestJson.options_ui.open_in_tab = false;
@@ -41,8 +43,6 @@ module.exports = function({ options, /*packageJson,*/ manifestJson, files, }) {
 		'web-ext-utils/options/editor/inline.css',
 		'web-ext-utils/options/editor/inline.js',
 		'web-ext-utils/options/index.js',
-		'web-ext-utils/tabview/index.css',
-		'web-ext-utils/tabview/index.js',
 		'web-ext-utils/update/index.js',
 		'web-ext-utils/utils/icons/',
 		'web-ext-utils/utils/event.js',

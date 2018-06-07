@@ -197,6 +197,6 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 }
 
 })().catch(error => {
+	console.error(error); setTimeout(() => process.exit(-1));
 	channel && channel.postMessage([ 'error', 0, JSON.stringify([ error.message, ]), ]);
-	setTimeout(() => process.exit(-1));
 });

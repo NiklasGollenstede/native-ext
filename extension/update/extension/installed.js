@@ -4,7 +4,6 @@
 	'background/config': Config,
 }) => {
 
-// TODO: test this!
 Config.write()
 .then(() => console.info('Setup complete'))
 .catch(() => notify({

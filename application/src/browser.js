@@ -31,7 +31,7 @@ if (config.locations && (extId in config.locations)) {
 		const path = Path.join(browser.profileDir, 'Extensions', extId); let versions;
 		try { versions = FS.readdirSync(path); } catch (_) { }
 		if (!versions || !versions.length) { throw new Error(`The extension ${extId} is not installed in the default location in ${browser.profileDir}`); }
-		browser.extDir = Path.resolve(path, versions[versions.length]); // this should probably use the highest semver
+		browser.extDir = Path.resolve(path, versions[versions.length - 1]); // this should probably use the highest semver
 	}
 }
 

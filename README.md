@@ -6,18 +6,21 @@
 
 This application enables browser extensions/add-ons to be truly awesome (again). If an extension you installed brought you here, please follow the instructions below:
 
+
 ### Installation
 
 Get the extension for your browser(s):
 
- * Chrome: TBA
- * Firefox: TBA
+ * Chrome: <sub><a href="https://chrome.google.com/webstore/detail/nativeext/kfabpijabfmojngneeaipepnbnlpkgcf/"><img src="./resources/get-chrome-ext-206x58" width="103" height="29"></a><sub>
+ * Firefox: <sub><a href="https://addons.mozilla.org/firefox/addon/native-ext/"><img src="./resources/get-firefox-ext-172x60.png" width="86" height="30"></a><sub>
 
 Then follow the (short) instructions on the options page to install and connect the application.
+
 
 ### Update
 
 The extension is automatically updated by the browser and should take care of everything else.
+
 
 ### Uninstallation
 
@@ -25,6 +28,11 @@ The extension can be removed like any other extension.
 There is no automated uninstallation for the application yet. The application is installed in the home folder, specifically in `%APPDATA%\de.niklasg.native_ext` on Windows, `~/.de.niklasg.native_ext` on Linux and `~/Library/Application Support/de.niklasg.native_ext` on macOS.
 Besides the files in that folder, each configuration in `profiles/` is linked elsewhere so that the browser can find it. There is a `unlink` script in every configuration folder.
 To remove NativeExt without traces, call all those `unlink` scripts and delete the installation/configuration folder.
+
+
+### Issues & Support
+
+If you have any questions not answered here or problems with the setup of NativeExt, please look for [existing issues](https://github.com/NiklasGollenstede/native-ext/issues?q=is:issue) and create a new one if your issue isn't opened yet.
 
 
 ## For developers
@@ -37,11 +45,13 @@ This means that browser extensions can now only do things that are, at least to 
 Many innovative things that could previously be implemented in Firefox Add-Ons are no longer possible.\
 The only way (partially) around this is to use "Native Messaging": WebExtensions in Chrome and Firefox can send JSON-messages to native applications running on the host system — if the target applications are explicitly designed for it.
 
+
 ### The Problem
 
 The problem with the Native Messaging approach is twofold. Where it was previously enough to develop and install a single JavaSceipt extension for a browser,
 - the developer now needs to write, pack and update an application for multiple operating systems and
 - the user needs to install and update that additional application for every extension that makes use of Native Messaging.
+
 
 ### Proposed solution
 
@@ -55,6 +65,7 @@ The NativeExt framework provides a very simple work flow for both developers and
 Extensions have to ask the user for permission and can then load any node.js modules they wish.
 Everything except the most basic code to initialize the node.js process is included in the extensions themselves, so software components are always updated in the browser and node.js parts of extensions at the same time: when the extension receives its update through the normal browser update mechanism.
 
+
 ### Implementation status
 
 Mostly done. Outstanding work:
@@ -64,6 +75,7 @@ Mostly done. Outstanding work:
  * Update dependencies and hand-puck them for the `package-lock.json`
  * Support for Edge, Opera, Vivaldi, ...
  * Write an uninstaller
+
 
 ### [API](./docs/README.md)
 
@@ -121,6 +133,7 @@ module.exports = fs;
 
 
 ### Extension location
+<!-- TODO: outdated -->
 
 As NativeExt loads code from inside the extension package, it needs to locate the local extension installation.
 Currently, the only supported location is in the `extensions/` (or `Extensions/`) folder in the profile, which is correct for normal extension installations.
@@ -157,15 +170,16 @@ or for all supported platforms:
 
 The builds will be placed in the `/release` folder.
 
-#### Build (library)
+#### Building (library)
 
 The library does not need to be build, but is needs to be linked for the extension. Prepare that by stepping in the `library` directory and running:
 
 `npm link`
 
-#### Build (extension)
+#### Building (extension)
 
-Step in the `extension` directory and install and build with `npm install`. use `npm start` to re-build.
+Step in the `extension` directory and install and build with `npm install`. Use `npm start` to re-build.
+
 
 ### Debugging
 

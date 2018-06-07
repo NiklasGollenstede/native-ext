@@ -49,6 +49,7 @@ const exports = Object.assign(new Manager({
 		chromium: null, opera: null, vivaldi: null, // probably not
 	})[browser] || 'https://github.com/NiklasGollenstede/native-ext/releases',
 });
+exports.onError((type, _error) => type === 'spawn' && setApplicationName(null));
 
 const { runtime, } = (global.browser || global.chrome);
 

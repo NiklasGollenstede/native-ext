@@ -68,7 +68,7 @@ async function writeProfile({ browser, dir, ids = [ ], locations, }) {
 
 	ids = Array.from(new Set(browser === 'firefox'
 		? [ '@'+ packageJson.name, '@'+ packageJson.name +'-dev', ...(ids || [ ]), ]
-		: [ /* TBD */ 'bgfocfgnalfpdjgikdpjimjokbkmemgp', ...(ids || [ ]), ]
+		: [ 'kfabpijabfmojngneeaipepnbnlpkgcf', ...(ids || [ ]), ]
 	));
 	const manifest = {
 		name, description: `WebExtensions native connector (${browser}:${dir})`,

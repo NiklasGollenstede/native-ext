@@ -2,15 +2,15 @@
 	'node_modules/web-ext-utils/browser/': { manifest, },
 	'node_modules/web-ext-utils/utils/semver': Version,
 	'node_modules/native-ext/': Native,
-	'common/options': options,
+	'common/exe-url': exeUrl,
 	require,
 }) => {
 
-const expected = new Version((/^\d+\.\d+\.\d+/).exec(manifest.version)[0]);
-const isRelease = expected.string === manifest.version;
+const expected = new Version((/^\d+\.\d+\.\d+/).exec(manifest.version)[0].replace(/\.\d+$/, '.0'));
 
 async function getVersions() {
 	return { installed: (await getInstalled()), expected, };
+	// return { installed: new Version('0.1.0'), expected: new Version('0.2.3'), }; // for testing
 }
 
 async function getInstalled() {
@@ -19,19 +19,23 @@ async function getInstalled() {
 	}, { blocking: false, });
 }
 
+async function check(version) {
+	const url = exeUrl(version); try {
+		const abort = new AbortController();
+		const { status, } = (await fetch(url, { signal: abort.signal, }));
+		abort.abort(); // GitHub doesn't support HEAD requests ...
+		return status >= 200 && status < 400 ? url : null;
+	} catch (error) { return null; }
+}
+
 async function install(version) {
-	const { os: { value: os, }, arch: { value: arch, }, } = options.internal.children;
-	const name = `native-ext-v${version}-${os}-${arch}`+ (os === 'win' ? '.exe' : '');
-	const url = `https://github.com/NiklasGollenstede/native-ext/releases/download/v${version}/`+ name;
+	const url = exeUrl(version), name = url.split('/').pop();
 	console.info('NativeExt installing update from', url);
 
 	// use browser to fetch binary as to not bypass proxy settings etc
-	let data; try { data = (await fetch(url).then(_=>_.blob()).then(blob => new Promise((onload, onerror) => {
+	const data = (await fetch(url).then(_=>_.blob()).then(blob => new Promise((onload, onerror) => {
 		Object.assign(new FileReader, { onerror, onload() { onload(this.result); }, }).readAsDataURL(blob);
-	}))); } catch (error) { if (isRelease) { throw error; }
-		throw new Error(`The application for this development build is not available set, please install it from source (${error.message})`);
-	}
-	data = data.replace(/^.*,/, ''); // remove data-URL prefix
+	}))).replace(/^.*,/, ''); // remove data-URL prefix
 
 	return Native.do(async process => {
 		(await (await process.require(require.resolve('./update.node.js')))).install(name, data);
@@ -39,7 +43,7 @@ async function install(version) {
 }
 
 return {
-	getVersions, install, // intended API
+	getVersions, check, install, // intended API
 };
 
 }); })(this);

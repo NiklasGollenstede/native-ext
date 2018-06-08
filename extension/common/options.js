@@ -1,14 +1,11 @@
 (function(global) { 'use strict'; define(async ({ // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+	'node_modules/web-ext-utils/browser/': { manifest, },
 	'node_modules/web-ext-utils/browser/storage': { local: storage, }, // do not synchronize the settings
 	'node_modules/web-ext-utils/browser/version': { gecko, },
 	'node_modules/web-ext-utils/options/': Options,
+	exeUrl,
 }) => {
 const isBeta = (/^\d+\.\d+.\d+(?!$)/).test((global.browser || global.chrome).runtime.getManifest().version); // version doesn't end after the 3rd number ==> bata channel
-
-const { navigator: { userAgent, oscpu, }, } = global;
-const windows = (/windows/i).test(userAgent), macos = !windows && (/mac\s*os\s*x/i).test(userAgent);
-const arch = macos || (windows ? (/x64/).test(oscpu) : (/x86_64/).test(oscpu) && !(/i386/).test(oscpu)) ? 'x64' : 'x86';
-const os = windows ? 'win' : macos ? 'macos' : 'linux';
 
 const rId = {
 	exp: !gecko ? (/^[a-p]{32}$/) : (/^{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}}$|^[\w.-]*@[\w.-]*$/),
@@ -19,7 +16,7 @@ const model = {
 	description: {
 		description: `The NativeExt extension manages access to the NativeExt application, which gives other browser extensions full access to your computer.<br>
 		NativeExt will explicitly ask you for every extension before granting it access to your system.<br>
-		To use NativeExt, you must <a download href="https://latest.native-ext.niklasg.de/download/${os}-${arch}/">download</a> and <b>install</b> the application, and then click the <b><code>Apply</code></b> button below.`,
+		To use NativeExt, you must <a download href="${ exeUrl() }">download</a> and <b>install</b> the application, and then click the <b><code>Apply</code></b> button below.`,
 	},
 	config: {
 		default: true,
@@ -74,17 +71,26 @@ const model = {
 			version: { default: '', restrict: { type: 'string', }, },
 		},
 	},
-	internal: {
+	update: {
+		description: ' ',
+		default: true,
+		input: { type: 'boolean', suffix: 'check for application updates', },
+		children: {
+			install: {
+				default: !isBeta,
+				input: { type: 'boolean', suffix: 'automatically install available updates', },
+			},
+		},
+	},
+	/*internal: {
 		title: 'Internal',
 		expanded: false,
 		hidden: !isBeta,
 		description: `Proceed at your own risk`,
 		default: true,
 		children: {
-			os: { default: os, },
-			arch: { default: arch, },
 		},
-	},
+	},*/
 	debug: {
 		title: 'Debug Level',
 		expanded: false,

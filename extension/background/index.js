@@ -17,9 +17,9 @@ void External; // listens for external messages
 const config = options.config.children; {
 	config.forceWrite.onChange(async (_, __, { values, }) => { try {
 		if (!values.isSet) { return; } setTimeout(() => values.reset(), 10);
-		notify.info(`Applying configuration`, `This may take a few seconds ...`);
+		notify.info('Applying configuration', `This may take a few seconds ...`);
 		(await (await require.async('./config')).write());
-		notify.success('Done!', 'The new configuration was written and verified');
+		notify.success('Done!', `The new configuration was written and verified.`);
 	} catch (error) { notify.error(error); } });
 
 	config.profile.children.path.onChange(() => {
@@ -30,11 +30,31 @@ const config = options.config.children; {
 
 
 // check for application update whenever the extension was updated
-updated.extension.updated && require.async('./update').then(async Update => {
+updated.extension.updated && new Promise(wake => setTimeout(wake, 60e3)).then(() => autoUpdate(false));
+options.update.onChange(() => autoUpdate(true));
+async function autoUpdate(explicit) { try {
+	if (!options.update.value) { return; }
+	const Update = (await require.async('./update'));
+	explicit && notify.info('Auto update started', 'Performing update check');
 	const { expected, installed, } = (await Update.getVersions());
-	if (expected <= installed) { return; }
+	if (expected === installed) { explicit && notify.success(
+		'Up to Date', `The expected version of the NativeExt application is already installed.`,
+	); return; }
+	const url = (await Update.check(expected));
+	if (!url) { notify.error(
+		'Update not available', `The expected update can not be downloaded at the moment.`,
+	); return; }
+	if (!options.update.children.install.value) { if (!(await notify({
+		title: 'Update available', message: `Click here to install version ${expected} or install it manually from ${url}`,
+		icon: 'warn', timeout: null,
+	}))) { return; } }
+	if (explicit) { notify({
+		title: 'Installing update', message: `Downloading and installing ${expected} from ${url}`,
+		icon: 'default', timeout: null,
+	}); } else { console.info('Installing update', `Downloading and installing ${expected} from ${url}`); }
 	(await Update.install(expected));
-}).catch(error => notify.error(`Automatic update failed`, error));
+	notify.success(`NativeExt ${expected} installed`, `Update was installed successfully, some extensions may need to be reloaded.`);
+} catch(error) {notify.error(`Automatic update failed`, error); } }
 
 
 // debug stuff
@@ -42,6 +62,7 @@ Object.assign(global, module.exports = {
 	Browser, Storage, notify,
 	options, updated,
 	External,
+	autoUpdate,
 });
 
 }); })(this);

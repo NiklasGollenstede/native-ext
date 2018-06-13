@@ -17,10 +17,9 @@ async function onMessageExternal(message, sender) { switch (message.request) {
 			vExtensions.splice(Infinity, 0, sender);
 			wants[sender] && wants[sender].forEach(_=>_());
 		}
-		if (!had || !vName.get()) {
-			try { (await (await require.async('./config')).write()); }
-			catch (error) { return { failed: true, code: 'config-failed', message: error.message, }; }
-		}
+		// Always write, to make sure the extension state is matched by the on-disc configuration.
+		try { (await (await require.async('./config')).write()); }
+		catch (error) { return { failed: true, code: 'config-failed', message: error.message, }; }
 		return { failed: false, name: vName.get(), };
 	}
 	case 'removePermission': {

@@ -17,6 +17,7 @@ class Manager {
 	 * @param  {string?}    .name       Name of the native application for `runtime.connectNative()`.
 	 * @param  {function?}  .name       Lazy async fallback getter for `.name`.
 	 * @param  {natural?}   .keepAlive  Time in ms to keep the process alive after the last listener was removed.
+	 * @param  {any?}       .inspect    Initial value for `this.inspect`.
 	 */
 	constructor(options) { return new _Manager(this, options); }
 
@@ -50,6 +51,10 @@ setEventGetter(Manager, '', Self);
  */
 setEventGetter(Manager, 'error', Self);
 
+/**
+ * @property {object|boolean?}  inspect  Current value is forwarded to the process(es) at the time of their creation.
+ */
+
 //// start implementation
 
 class _Manager {
@@ -57,10 +62,12 @@ class _Manager {
 		Self.set(this.public = self, this);
 		self._ = this; // only for debugging, will be removed
 
+		self.inspect = options.inspect;
 		this.name = options.name || null;
 		this.getName = options.getName || null;
+		this.throttle = options.throttle || 20e3;
 
-		this.spawning = null; this.active = 0; this.first = new Map;
+		this.spawning = null; this.active = this.crashed = 0; this.first = new Map;
 
 		void self.on; // invoke getter
 		this.fire.onadd = this.add.bind(this);
@@ -71,45 +78,65 @@ class _Manager {
 	}
 
 	async spawn() { return this.spawning || (this.spawning = (async () => { try {
-		const name = this.name || (this.name = (await this.getName()));
+
+		// TODO: handle this.first..blocking // EDIT: probably not ...
+		//	const noBlock = new Set; this.first.forEach(({ blocking, }, listener) => !blocking && noBlock.add(listener));
+		//	if (noBlock.size) { try { (await this.getName({ blocking: false, })); } catch (error) {
+		//		Object.freeze(error); noBlock.forEach(listener => {
+		//			const options = this.first.get(listener); if (!options) { return; } // too slow, never mind
+		//			options.reject(error); options.once && this.off(listener);
+		//		});
+		//	} }
+
+		const name = this.name || (this.name = (await this.getName(/*{ blocking: true, }*/)));
 		if (!this.fire || !this.fire.size) { return; } // too slow, never mind
 		if (!name) { throw new Error(`Could not get name to connect to NativeExt`); }
 
+		// avoid respawn loops, or at least slow them down
+		const wait = this.throttle - (Date.now() - this.crashed);
+		wait > 0 && (await new Promise(wake => setTimeout(wake, wait)));
+		if (!this.fire || !this.fire.size) { return; } // too slow, never mind
+
 		const process = this.process = (await new Process({
-			name,
+			name, inspect: this.public.inspect,
 			onStdout(enc, data) { console.info('stdout', enc, data); },
 			onStderr(enc, data) { console.warn('stderr', enc, data); },
 			onUncaught: this.onErorr.bind(this),
 			onRejected: this.onErorr.bind(this),
 			onExit: this.respawn.bind(this),
-		}));
+		})); this.crashed = 0;
 		if (!this.fire) { process.destroy(); return; } { this.process = process; }
-		if (!this.fire.size) { this.remove(); return; }
+		if (!this.fire.size) { this.remove(null); return; }
 
-		this.call(() => this.fire([ process, ], { filter: it => !this.first.has(it), })); // don't catch, no one cares
+		const first = new Map(this.first); this.first.clear(); // `.fire()` works on a slice as well, and may very well cause changes to `this.first`
+		this.call(() => this.fire([ process, ], { filter: it => !first.has(it), }))
+		.catch(error => console.error('Error in process spawn handler:', error));
 
-		this.first.forEach(async ([ resolve, reject, ], listener) => { try {
+		first.forEach(async ({ resolve, reject, }, listener) => { try {
 			resolve((await this.call(listener)));
 		} catch (error) { reject(error); } });
-		this.first.clear(); // clear immediately
 
 	} catch (error) {
-		if (this.first) { this.first.forEach(([ , reject, ]) => reject(error)); this.first.clear(); }
+		if (this.first) { this.first.forEach(({ reject, }) => reject(error)); this.first.clear(); }
 		this.fireError && this.fireError([ 'spawn', error, ]);
 	} finally { this.spawning = null; } })()); }
 
-	async respawn() {
+	async respawn(error) {
+		error && console.error('Native process crashed', error);
+		error && (this.crashed = Date.now());
+		this.process && this.process.destroy(); this.process = null;
 		if (!this.fire.size) { return; } // normal exit or crashed during `.do`.
 		this.spawn();
 	}
 
 	onErorr(error) {
-		this.process && this.process.destroy();
+		this.process && this.process.destroy(); this.process = null;
 		this.fireError && this.fireError([ 'uncaught', error, ]);
 	}
 
-	async do(action) {
-		return this.on(action, { once: true, });
+	async do(action, options) {
+		!options && (options = { }); options.once = true;
+		return this.on(action, options);
 	}
 
 	async add(listener, options) {
@@ -117,7 +144,9 @@ class _Manager {
 			options && options.once && this.on.removeListener(listener);
 			return this.call(listener);
 		} this.spawn();
-		return new Promise((y, n) => this.first.set(listener, [ y, n, ]));
+		return new Promise((resolve, reject) => this.first.set(listener, {
+			resolve, reject, // blocking: !options || options.blocking,
+		}));
 	}
 
 	async call(listener) {
@@ -125,7 +154,8 @@ class _Manager {
 		finally { this.active -= 1; this.remove(); }
 	}
 
-	remove() {
+	remove(listener) {
+		this.first.delete(listener);
 		if (!this.process || this.fire.size || this.active) { return; }
 		this.process && this.process.destroy(); this.process = null;
 	}
@@ -133,7 +163,7 @@ class _Manager {
 	destroy() {
 		if (!this.public) { return; }
 		Self.delete(this.public); this.public = null;
-		this.first.forEach(([ , reject, ]) => reject(Error(`Manager was destroyed`)));
+		this.first.forEach(({ reject, }) => reject(Error(`Manager was destroyed`)));
 		this.fire(null, { last: true, });
 		this.process && this.process.destroy();
 		this.process = this.fire = this.on = this.first = null;

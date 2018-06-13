@@ -1,4 +1,10 @@
-/* eslint-env node */ /* eslint-disable strict */ 'use strict'; module.exports =  async channel => {
+/* eslint-env node */ /* eslint-disable strict */ 'use strict'; module.exports =  async (channel, config) => {
+
+if (config.inspect) {
+	const { port, host, break: doBreak, } = config.inspect;
+	require('inspector').open(port, host, doBreak);
+	if (doBreak) { debugger; } // eslint-disable-line no-debugger
+}
 
 const Path = require('path');
 
@@ -9,7 +15,7 @@ process.on('unhandledRejection', async error => !(await port.request('rejected',
 
 port.addHandlers({
 	async require(path, options, callback) {
-		if (!(/\bn(?:ative|ode)\.js$|(?:^|[\\/])n(?:ative|ode)[\\/]/).test(path)) {
+		if (!(/(?:\bn(?:ative|ode)|(?:^|[\\/])n(?:ative|ode)[\\/].*)\.js$/).test(path)) {
 			throw new Error(`path must contain /node/ or /native/ or end with \\bnode.js or \\bnative.js`);
 		}
 		const exports = (await process.mainModule.require(Path.join('/webext/', path)));

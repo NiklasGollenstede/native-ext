@@ -6,7 +6,7 @@
 	require,
 }) => {
 
-const expected = new Version((/^\d+\.\d+\.\d+/).exec(manifest.version)[0].replace(/\.\d+$/, '.0'));
+const expected = new Version((/^\d+\.\d+\.\d+/).exec(manifest.version)[0]);
 
 async function getVersions() {
 	return { installed: (await getInstalled()), expected, };

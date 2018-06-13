@@ -10,6 +10,17 @@ skip_tags: true # (commits create tags, so) don't build on tags
 # appveyor automatically skips commits with `[skip ci]` in the message (title)
 
 
+# TODO:
+# Cross-compile on one (linux) machine for all targets (e.g. `npm install --production --target_arch=arm --target_platform=linux`),
+# then build actual installers (https://installbuilder.bitrock.com/open-source-licenses.html)
+# that just zip the current node LTS (in system bitness), the sources and the (compiled) modules.
+# The sources/modules and node LTS (like the browser) can then be updated independently.
+# Also, unzip/copy each extension in each profile config dir and simply set the cwd/mainModule to that path.
+# This allows for much less manipulation of the node environment, devs know exactly what they get (node LTS)
+# and can even fork/span new processes.
+# The only difference for the entry process is the stdio redirection and the arguments to the entry script.
+
+
 image: # build for windows and linux
   - Visual Studio 2015
   - Ubuntu

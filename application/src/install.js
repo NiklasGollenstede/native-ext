@@ -14,14 +14,14 @@ const execute = (bin, ...args) => new Promise((resolve, reject) => child_process
 	(error, stdout, stderr) => error ? reject(Object.assign(error, { stderr, stdout, })) : resolve(stdout)
 ));
 
-const unpacked = !process.versions.pkg;
-const packageJson = require('../package.json'), { version, } = packageJson;
+const pkg = !!process.versions.pkg, nexe = !!process.__nexe, unpacked = !pkg && !nexe;
+const packageJson = require('./package.json'), { version, } = packageJson;
 const fullName = packageJson.fullName.replace(/^\W|[^\w.]|\W$/g, '_'); // must match /^\w[\w.]*\w$/
 const source = Path.normalize(unpacked ? __dirname : process.argv[0]); // location of packed executable or project root
 
 const nodeOptions = process.argv.find(_=>_.startsWith('--node-options='));
 const windows = process.platform === 'win32', linux = process.platform === 'linux', macos = process.platform === 'darwin';
-const scriptExt = windows ? '.bat' : '.sh';
+const scriptExt = windows ? '.bat' : '.sh', forwardArgs = windows ? '%*' : '$@';
 const installDir = (windows ? process.env.APPDATA +'\\' : require('os').homedir() + (macos ? '/Library/Application Support/' : '/.')) + fullName;
 
 const outPath = (...path) => Path.resolve(installDir, ...path);
@@ -40,16 +40,15 @@ async function install() {
 
 		...(unpacked ? [
 			replaceFile(outPath('bin', 'latest'+ scriptExt), script(
-				process.argv[0],
+				process.argv[0], ...process.execArgv,
 				...(nodeOptions ? nodeOptions.slice(15).split(',') : [ ]),
-				process.argv[1],
-				windows ? '%*' : '$@',
+				Path.join(__dirname, 'index.js'), forwardArgs,
 			), { mode: '754', }),
 		] : [
 			source !== bin && copyFile(bin, source).then(() => chmod(bin, '754')),
-			readFile(Path.join(__dirname, '../node_modules/ref/build/Release/binding.node'))     .then(data => replaceFile(outPath(bin +'/../ref.node'), data)), // copyFile doesn't work
-			readFile(Path.join(__dirname, '../node_modules/ffi/build/Release/ffi_bindings.node')).then(data => replaceFile(outPath(bin +'/../ffi.node'), data)), // copyFile doesn't work
-			replaceFile(outPath('bin', 'latest'+ scriptExt), script(bin, windows ? '%*' : '$@'), { mode: '754', }),
+			readFile(Path.join(__dirname, 'node_modules/ref/build/Release/binding.node'))     .then(data => replaceFile(outPath(bin +'/../res/ref.node'), data)), // copyFile doesn't work
+			readFile(Path.join(__dirname, 'node_modules/ffi/build/Release/ffi_bindings.node')).then(data => replaceFile(outPath(bin +'/../res/ffi.node'), data)), // copyFile doesn't work
+			replaceFile(outPath('bin', 'latest'+ scriptExt), script(bin, forwardArgs), { mode: '754', }),
 		]),
 
 		!windows && writeProfile({ bin, browser: 'chromium', dir: '', }),
@@ -107,7 +106,7 @@ async function writeProfile({ browser, dir, ids, locations, }) {
 			outPath('bin', 'latest'+ scriptExt),
 			!dir ? 'config' : 'connect',
 			target +'config.json',
-			windows ? '%*' : '$@',
+			forwardArgs,
 		), { mode: '754', }),
 
 		windows ? execute('REG', 'ADD', link, '/ve', '/t', 'REG_SZ', '/d', target +'manifest.json', '/f')

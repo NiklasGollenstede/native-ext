@@ -5,12 +5,6 @@
  */
 
 
-const FS = Object.assign({ }, require('fs')), Path = require('path');
-const Module = require('module');
-const packageJson = module.require(Path.join(__dirname, '../package.json'));
-const config = JSON.parse(FS.readFileSync(process.argv[3]));
-
-
 // set up communication
 channel = new (require('./runtime-port.js'))({
 	name: '',
@@ -20,26 +14,18 @@ channel = new (require('./runtime-port.js'))({
 require('./redirect-stdout.js')({ channel, }); // can't log to stdio if started by the browser ==> forward to browser console
 
 
-if (process.argv[2] === 'config') { // configuration mode
-	const Port = require('multiport'), port = new Port(channel, Port.web_ext_Port);
-	// only the management extension is allowed to connect like this
-	port.addHandlers({
-		ping() { return 'pong'; },
-		locateProfile: require('./locate-profile.js')({ config, }),
-		async writeProfile({ dir, ids, locations, }) {
-			FS.accessSync(dir); const { browser, } = config;
-			const manifest = (await require('./install.js').writeProfile({ browser, dir, ids, locations, }));
-			return { name: manifest.name, version: packageJson.version, };
-		},
-	});
-	process.stdin.resume(); return;
-}
+const FS = Object.assign({ }, require('fs')), Path = require('path');
+const Module = require('module');
+const packageJson = JSON.parse(FS.readFileSync(Path.join(__dirname, 'package.json')));
+const config = JSON.parse(FS.readFileSync(process.argv[3]));
 
 
 const { modules, requireClean, exposeLazy, } = (() => { // patch `require()` to expose modules
 	const modules = { __proto__: null, };
 	const { _resolveFilename, _load, } = Module;
 	const cwd = process.cwd();
+	const isNexe = typeof FuseBox !== 'undefined'; /* global FuseBox */
+	isNexe && (FuseBox.require = id => modules[id] || require(id));
 
 	Module._resolveFilename = function(path) {
 		if (path in modules) { return path; }
@@ -70,32 +56,46 @@ const { modules, requireClean, exposeLazy, } = (() => { // patch `require()` to 
 		}, });
 	}
 
-	return { modules, requireClean, exposeLazy, };
+	return { modules, requireClean: isNexe ? require : requireClean, exposeLazy, };
 })();
 
 
 { // expose and lazy load 'ffi' and 'ref'
-	const cwd = process.cwd(), bindingsPath = require.resolve('bindings'); let bindingsModule;
+	const unpacked = !process.versions.pkg && !process.__nexe;
 
-	exposeLazy('ffi', makeLazyLoader('ffi', () => void modules.ref));
-	exposeLazy('ref', makeLazyLoader('ref'));
+	exposeLazy('ffi', unpacked ? () => requireClean('ffi') : makeLazyLoader('ffi', () => void modules.ref));
+	exposeLazy('ref', unpacked ? () => requireClean('ref') : makeLazyLoader('ref'));
 	exposeLazy('ref-array', () => requireClean('ref-array'));
+	exposeLazy('ref-union', () => requireClean('ref-union'));
 	exposeLazy('ref-struct', () => requireClean('ref-struct'));
 
 	function makeLazyLoader(name, precond) { return () => {
 		precond && precond();
-		if (!bindingsModule) { module.require(bindingsPath); bindingsModule = require.cache[bindingsPath]; }
-		const bindingsExports = bindingsModule.exports;
-		const nodePath = Path.join(cwd, `res/${name}.node`);
-		Module._cache = Object.create(Module._cache);
-		let exports; try {
-			bindingsModule.exports = () => module.require(nodePath);
+		const nodePath = Path.join(process.argv[0], `../res/${name}.node`);
+		let exports; try { // TODO: this doesn't work with nexe because the `require` in the shipped modules is that of fuse-box,
+			// so nexe still creates the temp dirs in the cwd for the `.node` files
+			modules.bindings = () => { /*console.log('loading', nodePath);*/ return requireClean(nodePath); };
 			exports = requireClean(name);
 		} finally {
-			Module._cache = Object.getPrototypeOf(Module._cache);
-			bindingsModule.exports = bindingsExports;
+			delete modules.bindings;
 		} return exports;
 	}; }
+}
+
+
+if (process.argv[2] === 'config') { // configuration mode
+	const Port = require('multiport'), port = new Port(channel, Port.web_ext_Port);
+	// only the management extension is allowed to connect like this
+	port.addHandlers({
+		ping() { return 'pong'; },
+		locateProfile: require('./locate-profile.js')({ config, }),
+		async writeProfile({ dir, ids, locations, }) {
+			FS.accessSync(dir); const { browser, } = config;
+			const manifest = (await require('./install.js').writeProfile({ browser, dir, ids, locations, }));
+			return { name: manifest.name, version: packageJson.version, };
+		},
+	});
+	process.stdin.resume(); return;
 }
 
 
@@ -105,7 +105,7 @@ channel.name = browser.extId;
 
 
 // set up file system
-const extRoot = Path.resolve('/webext/'); let extDir; {
+const extRoot = Path.resolve('/webext/'); let extDir; { // TODO: use ./patch-fs.js
 	({ extDir, } = browser); if (!extDir) { if (browser.extFile) {
 		const tmp = require('tmp'); tmp.setGracefulCleanup(); // dirs are not being deleted
 		extDir = tmp.dirSync({ prefix: 'webext-', }).name;
@@ -163,18 +163,17 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 
 { // general process fixes
 	process.versions['native-ext'] = packageJson.version;
-	process.argv.splice(0, Infinity);
-	process.mainModule.filename = extRoot + Path.sep +'.';
-	process.mainModule.paths = module.constructor._nodeModulePaths(process.mainModule.filename);
-	process.mainModule.exports = null;
-	process.mainModule.children.splice(0, Infinity);
-	process.chdir(extDir);
+	const main = process.mainModule; // TODO: create a new Module(...) ?
+	main.filename = extRoot + Path.sep +'.'; main.id = '.';
+	main.paths = main.constructor._nodeModulePaths(main.filename);
+	main.exports = null; main.children.splice(0, Infinity);
+	process.argv.splice(0, Infinity); process.chdir(extDir);
 }
 
 
 { // cleanup
 	const { cache, } = require; // there are still references to the loaded modules ...
-	Object.keys(cache).forEach(key => delete cache[key]);
+	cache && Object.keys(cache).forEach(key => delete cache[key]);
 	global.gc && global.gc();
 }
 
@@ -193,7 +192,9 @@ const extRoot = Path.resolve('/webext/'); let extDir; {
 		Object.defineProperty(_eval, 'name', { value: 'eval', }); Object.defineProperty(_eval, 'length', { value: 1, });
 		(_Function.prototype = _Function.constructor.prototype).constructor = _Function; global.eval = _eval;
 	}
-	(await process.mainModule.require('./'+ config.main)(channel));
+	const entry = './'+ Path.posix.normalize(config.main);
+	// TODO: process.argv.splice(0, Infinity, process.argv0, entry);
+	(await process.mainModule.require(entry)(channel, config));
 }
 
 })().catch(error => {

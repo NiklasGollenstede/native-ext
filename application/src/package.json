@@ -1,0 +1,31 @@
+{
+	"name": "native-ext",
+	"fullName": "de.niklasg.native-ext",
+	"version": "0.3.1",
+	"description": "WebExtensions native connector application",
+	"author": "Niklas Gollenstede",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git@github.com:NiklasGollenstede/native-ext.git"
+	},
+	"dependencies": {
+		"extract-zip": "1.6.7",
+		"ffi": "2.2.0",
+		"mkdirp": "0.5.1",
+		"multiport": "0.2.3",
+		"ref-array": "^1.2.0",
+		"ref-struct": "^1.1.0",
+		"ref-union": "^1.0.1",
+		"rimraf": "2.6.2",
+		"tmp": "0.0.33"
+	},
+	"main": "index.js",
+	"bin": "index.js",
+	"pkg": {
+		"assets": [
+			"node_modules/ref/build/Release/binding.node",
+			"node_modules/ffi/build/Release/ffi_bindings.node"
+		]
+	}
+}

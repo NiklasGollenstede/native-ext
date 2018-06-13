@@ -9,7 +9,7 @@ const { Writable, } = require('stream');
  */
 module.exports = function({ channel, }) {
 	const stream = name => new Writable({ write(chunk, encoding, callback) {
-		if ((/^utf-?8$/i).test(encoding)) { encoding = ''; }
+		if ((/^utf-?8$/i).test(encoding) && typeof chunk === 'string') { encoding = ''; }
 		else if (encoding !== 'buffer') { chunk = global.Buffer.from(chunk, encoding); }
 		if (typeof chunk !== 'string') { chunk = chunk.toString('base64'); }
 		channel.postMessage([ name, 0, JSON.stringify([ encoding, chunk, ]), ]);

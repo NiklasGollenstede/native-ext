@@ -6,17 +6,62 @@
 	{ setEventGetter, }, Port, require,
 ) => {
 
+/**
+ * Spawns a single native process and manages the communication with it.
+ * Allows the extension to `require()` node modules and returns RPC wrappers to their `exports`.
+ */
 class Process {
+	/**
+	 * Asynchronously creates (spawns) the process via Native Messaging.
+	 * @param  {string}     .name     Registered name of the Native Messaging app to spawn.
+	 * @param  {object?}    .inspect  Optional boolean whether or object `{ port, host, break, }` how to open the inspector.
+	 * @param  {function?}  .on*      Optional initial listener for each instance event.
+	 */
 	constructor(options) { return new _Process(this, options); }
+
+	/**
+	 * Uses `require` to load a file bundled with the extension as node module in the native process
+	 * and returns an RPC wrapper to its (resolved) exports.
+	 * @param  {string}  id  Absolute path to `.js` the file to load. Must have 'node' or 'native'
+	 *                       as last word before the '.js' or path segment name.
+	 * @return {any}         Multiport extended JSON clone on the `exports` of the module,
+	 *                       but if the exports are an object, Multiports mapping is applied
+	 *                       to each value on the object (not only the return value itself).
+	 *                       This especially means that is possible to load (flat) objects of functions.
+	 */
 	async require(id) { return Self.get(this).require(id); }
+
+	/**
+	 * @return {boolean}  `true` iff `this` is a not-yet-destroyed/terminated `Process` instance.
+	 */
 	get alive() { return !!Self.get(this); }
+
+	/// Destroys the `Process` handle, killing the native process if it is still alive. No-op on dead processes.
 	destroy() { const self = Self.get(this); self && self.destroy(); }
 } const Self = new WeakMap;
+
+/**
+ * Event fired with `(encoding, data)` when the process writes to `stdout`.
+ * If `encoding` is the empty string, `data` is (and was written as) an `utf-8` string.
+ * Otherwise, `data` is a `base64` representation of the logged data and `encoding` its encoding.
+ */
 setEventGetter(Process, 'stdout', Self);
+/// As `onStdout`, but for `stderr`.
 setEventGetter(Process, 'stderr', Self);
+
+/**
+ * Event fired when `process.on('uncaughtException')` fires in the process.
+ * If not at least one handler handles this event without throwing, the process will terminate itself.
+ */
 setEventGetter(Process, 'uncaught', Self);
+/// As `onUncaught`, but for `'unhandledRejection'`.
 setEventGetter(Process, 'rejected', Self);
-setEventGetter(Process, 'exit', Self, { once: true, });
+
+/**
+ * Fired directly after the `Process` was `.destroy()`ed.
+ * If it was destroyed internally due to an error, that error is the only argument to the listeners.
+ */
+setEventGetter(Process, 'exit', Self, { async: true, once: true, });
 
 //// start implementation
 
@@ -28,6 +73,8 @@ class _Process {
 	constructor(self, options) { return (async () => { try { {
 		Self.set(this.public = self, this);
 		self._ = this; // only for debugging, will be removed
+
+		const inspect = typeof options.inspect === 'object' || typeof options.inspect === 'boolean' ? options.inspect : undefined;
 
 		this.cache = { }; // modules exports
 		[ 'onStdout', 'onStderr', 'onUncaught', 'onRejected', 'onExit', ]
@@ -51,7 +98,7 @@ class _Process {
 		});
 
 		// setup
-		channel.postMessage({ main: initPath, });
+		channel.postMessage({ main: initPath, inspect, });
 		(await Promise.race([ new Promise((ready, failed) => {
 			port.addHandler('ready', ready); port.addHandler('error', msg => failed(new Error(msg)));
 		}), port.ended, ]));
@@ -72,7 +119,7 @@ class _Process {
 					return entries[0];
 				} else { // object properties, every second entry is a value that may be a remote function
 					const exports = { }; for (let i = 0; i < entries.length; i += 2) {
-						exports[entries[i]] = entries[i +1];
+						exports[entries[i]] = entries[i + 1];
 					} return exports;
 				}
 			}),

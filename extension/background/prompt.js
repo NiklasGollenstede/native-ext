@@ -12,6 +12,7 @@ async function requestPermission({ id, message, }) {
 
 	document.body.innerHTML = `<style>
 		html { font-family: Segoe UI, Tahoma, sans-serif; font-size: 100%; overflow: hidden; }
+		html { max-width: 470px; } /* there is (or hopefully was) a rare bug in FF that the prompt is very wide */
 		body>* { font-size: 16px; } /* chrome has a rule on the body itself */
 		body { background: #1c2227; } html, img { filter: invert(1) hue-rotate(180deg); }
 		html { box-sizing: border-box; } * { box-sizing: inherit; }

@@ -13,7 +13,16 @@ const home = require('os').homedir();
 return async function({ magic, extId, }) {
 
 	// step 1: find all dirs that contain the profiles to check
-	let parents = [ ]; switch (config.browser) { case 'firefox': {
+	let parents = [ ], names = null; switch (config.browser) { case 'firefox': {
+
+		const { cwd, args, } = getBrowserArgs(); // get from cli
+		const iProfileArg = args.findIndex(arg => (/^"?-profile"?$/i).test(arg)) + 1;
+		if (iProfileArg !== 0 && args[iProfileArg]) {
+			const path = makeAbsolute(args[iProfileArg].replace(/^"|"$/g, ''), cwd); if (!path) { break; }
+			names = [ Path.basename(path), ]; parents = [ Path.dirname(path), ]; break;
+		}
+		// there is also a flag to choose a specific profile in the default location, but we should find that anyway
+
 		switch (process.platform) { // use default, no configuration in for firefox
 			case 'win32': {
 				parents = [ process.env.APPDATA + String.raw`\Mozilla\Firefox\Profiles`, ];
@@ -33,49 +42,46 @@ return async function({ magic, extId, }) {
 		const { cwd, args, } = getBrowserArgs(); // get from cli
 		const arg = args.find(arg => (/^"?--user-data-dir=/).test(arg)); if (arg) { // TODO: does /user-data-dir= work as well (on windows?)
 			let cdd = arg.replace(/"/g, '').replace(/^--user-data-dir=/, '').replace(/\\ /g, ' ');
-			if (!Path.isAbsolute(cdd)) {
-				if (cdd.startsWith('~/')) { if (process.platform !== 'win32') { cdd = Path.join(home, cdd.slice(2)); } }
-				else { if (cwd) { cdd = Path.resolve(cwd, cdd); } }
-			}
-			parents = [ cdd, ];
-		} else { // get from env or default
-			switch (process.platform) {
-				case 'win32': {
-					const prefix = process.env.LOCALAPPDATA;
+			cdd = makeAbsolute(cdd, cwd); cdd && (parents = [ cdd, ]); break;
+		}
+
+		// get from env or default
+		switch (process.platform) {
+			case 'win32': {
+				const prefix = process.env.LOCALAPPDATA;
+				parents = (config.browser === 'chromium' ? [
+					String.raw`Chromium\User Data`, // chromium
+				] : [
+					String.raw`Google\Chrome\User Data`, // release
+					String.raw`Google\Chrome Beta\User Data`, // beta
+					String.raw`Google\Chrome SxS\User Data`, // canary
+				]).map(suffix => Path.join(prefix, suffix));
+			} break;
+			case 'linux': {
+				if (process.env.CHROME_USER_DATA_DIR) {
+					parents = [ Path.resolve(process.env.CHROME_USER_DATA_DIR), ];
+				} else {
+					const prefix = (process.env.CHROME_CONFIG_HOME || process.env.XDG_CONFIG_HOME || '~/.config').replace(/^~(?=[\\/])/, () => home);
 					parents = (config.browser === 'chromium' ? [
-						String.raw`Chromium\User Data`, // chromium
+						'chromium',
 					] : [
-						String.raw`Google\Chrome\User Data`, // release
-						String.raw`Google\Chrome Beta\User Data`, // beta
-						String.raw`Google\Chrome SxS\User Data`, // canary
+						'google-chrome',
+						'google-chrome-beta',
+						'google-chrome-unstable',
 					]).map(suffix => Path.join(prefix, suffix));
-				} break;
-				case 'linux': {
-					if (process.env.CHROME_USER_DATA_DIR) {
-						parents = [ Path.resolve(process.env.CHROME_USER_DATA_DIR), ];
-					} else {
-						const prefix = (process.env.CHROME_CONFIG_HOME || process.env.XDG_CONFIG_HOME || '~/.config').replace(/^~(?=[\\/])/, () => home);
-						parents = (config.browser === 'chromium' ? [
-							'chromium',
-						] : [
-							'google-chrome',
-							'google-chrome-beta',
-							'google-chrome-unstable',
-						]).map(suffix => Path.join(prefix, suffix));
-					}
-				} break;
-				case 'darwin': {
-					const prefix = home +'/Library/Application Support';
-					parents = (config.browser === 'chromium' ? [
-						String.raw`Chromium`, // chromium
-					] : [
-						String.raw`Google\Chrome`, // release
-						String.raw`Google\Chrome Beta`, // beta
-						String.raw`Google\Chrome Canary`, // canary
-					]).map(suffix => Path.join(prefix, suffix));
-				} break;
-				default: throw new Error(`Unknown OS ${process.platform}`);
-			}
+				}
+			} break;
+			case 'darwin': {
+				const prefix = home +'/Library/Application Support';
+				parents = (config.browser === 'chromium' ? [
+					String.raw`Chromium`, // chromium
+				] : [
+					String.raw`Google\Chrome`, // release
+					String.raw`Google\Chrome Beta`, // beta
+					String.raw`Google\Chrome Canary`, // canary
+				]).map(suffix => Path.join(prefix, suffix));
+			} break;
+			default: throw new Error(`Unknown OS ${process.platform}`);
 		}
 	} }
 
@@ -84,17 +90,26 @@ return async function({ magic, extId, }) {
 	? `/browser-extension-data/${extId}/storage.js`
 	: `/Local Extension Settings/${extId}/000003.log`;
 
+
 	// step 2: check all possible locations for that magic value
 	return (await Promise.all([ ].concat(...parents.map(dir => { try {
-		return FS.readdirSync(dir).map(name => Path.join(dir, name));
+		return (names || FS.readdirSync(dir)).map(name => Path.join(dir, name));
 	} catch (_) { return null; } }).filter(_=>_)).map(profile => new Promise(done => {
 		FS.readFile(profile + path, (error, data) => {
 			if (error) { done(null); return; }
-			done(data.includes(magic) ? profile : null);
+			done(data.includes(magic) ? Path.normalize(profile) : null);
 		});
 	})))).find(_=>_);
 
 };
+
+function makeAbsolute(path, base) {
+	if (Path.isAbsolute(path)) { return path; }
+	if (path.startsWith('~/')) { // TODO: do these have env vars expanded? If not, replace HOME/APPDATA/...
+		if (process.platform === 'win32') { return null; }
+		else { return Path.join(home, path.slice(2)); }
+	} else { return base ? Path.resolve(base, path) : null; }
+}
 
 function getBrowserArgs() {
 	const exec = require('child_process').execFileSync;

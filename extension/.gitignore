@@ -5,3 +5,7 @@ manifest.json
 NativeExt
 NativeExt.html
 view.html
+
+package-lock.json
+# Only the exact versions of the included libraries, which are direct dependencies without children should matter.
+# Other packages can be upgraded as long as they stick to SemVer.

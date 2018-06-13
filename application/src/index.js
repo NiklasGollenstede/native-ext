@@ -5,6 +5,7 @@ Error.stackTraceLimit = Infinity; // get them all ...
 const args = process.argv.slice(2);
 
 switch (args[0]) {
+	case 'eval': { console.log(eval(args.slice(1).join(' '))); } break;
 	case undefined: // started from file system / without args ==> install
 	case 'install': /*case 'refresh': case 'uninstall':*/ {
 		const command = args[0] || 'install';
@@ -27,7 +28,7 @@ switch (args[0]) {
 });
 
 function dialog(type, title, message) {
-	if (process.argv.includes('--no-dialog')) { return; }
+	if (process.argv.includes('--no-dialog')) { console[type](title, message); return; }
 	switch (process.platform) {
 		case 'win32': {
 			type = ({ info: 64, warn: 48, error: 16, })[type] || 0;

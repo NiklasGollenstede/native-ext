@@ -42,10 +42,10 @@ const exports = Object.assign(new Manager({
 	setApplicationName,
 
 	extensionInstallPage: browser => ({
-		edge: null, // TODO: publish
-		firefox: null, // TODO: publish
-		fennec: null, // TODO: publish
-		chrome: null, // TODO: publish
+		edge: null, // Edge 15 supports native messaging, but does it pretty differently (https://docs.microsoft.com/en-us/microsoft-edge/extensions/guides/native-messaging). Also "Allowing other apps to download content that changes extension behavior" is not allowed, whatever that actually means.
+		firefox: 'https://addons.mozilla.org/firefox/addon/native-ext/',
+		fennec: null, // doesn't currently make sense
+		chrome: 'https://chrome.google.com/webstore/detail/nativeext/kfabpijabfmojngneeaipepnbnlpkgcf',
 		chromium: null, opera: null, vivaldi: null, // probably not
 	})[browser] || 'https://github.com/NiklasGollenstede/native-ext/releases',
 });

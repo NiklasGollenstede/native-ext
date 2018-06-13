@@ -9,10 +9,7 @@ This application enables browser extensions/add-ons to be truly awesome (again).
 
 ### Installation
 
-Get the extension for your browser(s):
-
- * Firefox: <sub><sub><sub><sub><sub><a href="https://addons.mozilla.org/firefox/addon/native-ext/"><img src="./resources/get-firefox-ext-172x60.png" width="86" height="30"></a></sub></sub></sub></sub></sub>
- * Chrome: <sub><sub><sub><sub><sub><a href="https://chrome.google.com/webstore/detail/nativeext/kfabpijabfmojngneeaipepnbnlpkgcf/"><img src="./resources/get-chrome-ext-206x58.png" width="103" height="29"></a></sub></sub></sub></sub></sub>
+Get the extension for your browser(s): <sub><sub><a href="https://addons.mozilla.org/firefox/addon/native-ext/"><img src="./resources/get-firefox-ext-172x60.png" width="86" height="30"></a></sub></sub> <sub><sub><a href="https://chrome.google.com/webstore/detail/nativeext/kfabpijabfmojngneeaipepnbnlpkgcf/"><img src="./resources/get-chrome-ext-206x58.png" width="103" height="29"></a></sub></sub>
 
 Then follow the (short) instructions on the options page to install and connect the application.
 
@@ -59,7 +56,7 @@ It seems that there is no way around Native Messaging. If you want to implement 
 Therefore, both developing and installing and updating the native applications needs to be as easy as possible, to lower the barrier to entry for developers and users.\
 The NativeExt framework provides a very simple work flow for both developers and users:
 
-**User** install the NativeExt extension and follow simple and short instructions to install and connect the native application endpoint. Once installed, the extension and application update themselves. Allowing extensions to use NativeExt only requires a single click; all configuration is written automatically.
+**Users** install the NativeExt extension and follow simple and short instructions to install and connect the native application endpoint. Once installed, the extension and the application update themselves. Allowing extensions to use NativeExt only requires a single click; all configuration is written automatically.
 
 **Developers** have two choices, they can either use the bare-bone connection and communication protocols of NativeExt directly, or they can use the library included in this project.
 Extensions have to ask the user for permission and can then load any node.js modules they wish.

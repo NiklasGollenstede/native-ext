@@ -1,5 +1,8 @@
 'use strict';
 
+// nexe messes with the local require of the included modules, which prevents the require hooks from working, but we need them here.
+typeof FuseBox !== 'undefined' && ({ require, } = FuseBox); // eslint-disable-line
+
 switch (process.platform) {
 	case 'win32': {
 		const ffi = require('ffi'), { alloc, types, refType, } = require('ref'), tpVoid = refType(types.void);

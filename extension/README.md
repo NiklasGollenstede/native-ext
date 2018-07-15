@@ -14,7 +14,7 @@ For more information on what and why NativeExt is, see the <a href="https://gith
 
 <b>Permissions used</b>:<ul>
 	<li> <b>Exchange messages with programs</b>: Manage and launch the extension process </li>
-	<li> <b>Display notifications</b>: Inform about setup status and errors </li>
-	<li> <b>Recently closed tabs</b>: Remove own popups from closed windows </li>
+	<li> <b>Display notifications</b>: Inform about setup status, updates and errors </li>
+	<li> <b>Recently closed tabs</b>: Remove own popups from recently closed windows </li>
 	<li> <b>Access github.com and s3.amazonaws.com</b>: Download application updates </li>
 </ul>

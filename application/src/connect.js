@@ -69,17 +69,19 @@ const { modules, requireClean, exposeLazy, } = (() => { // patch `require()` to 
 	exposeLazy('ref-union', () => requireClean('ref-union'));
 	exposeLazy('ref-struct', () => requireClean('ref-struct'));
 
-	function makeLazyLoader(name, precond) { return () => {
-		precond && precond();
+	function makeLazyLoader(name, precond) {
 		const nodePath = Path.join(process.argv[0], `../res/${name}.node`);
-		let exports; try { // TODO: this doesn't work with nexe because the `require` in the shipped modules is that of fuse-box,
-			// so nexe still creates the temp dirs in the cwd for the `.node` files
-			modules.bindings = () => { /*console.log('loading', nodePath);*/ return requireClean(nodePath); };
-			exports = requireClean(name);
-		} finally {
-			delete modules.bindings;
-		} return exports;
-	}; }
+		return () => {
+			precond && precond();
+			let exports; try { // TODO: this doesn't work with nexe because the `require` in the shipped modules is that of fuse-box,
+				// so nexe still creates the temp dirs in the cwd for the `.node` files
+				modules.bindings = () => { /*console.log('loading', nodePath);*/ return requireClean(nodePath); };
+				exports = requireClean(name);
+			} finally {
+				delete modules.bindings;
+			} return exports;
+		};
+	}
 }
 
 

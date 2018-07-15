@@ -11,7 +11,7 @@ async function install(name, data) {
 	(await chmod(path, '754'));
 	try { (await exec(path, [ 'install', '--no-dialog', ], { })); }
 	catch (error) { console.error(error.stderr); throw error; }
-	try { (await unlink(path)); } catch (_) { }
+	finally { try { (await unlink(path)); } catch (_) { } }
 }
 
 module.exports = { // dummy

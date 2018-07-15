@@ -41,10 +41,10 @@ async function write() { let port; try {
 		throw new Error(`Please set the browser profile manually or try auto detection`);
 	} }
 
-	// read th configuration values
+	// read the configuration values
 	const ids = options.config.children.extensions.values.current;
 	const locations = options.config.children.external.values.current
-	.reduce((o, [ k, v, ]) => ((o[k] = v), o), { });
+	.reduce((o, [ k, v, ]) => ((o[k] = v), o), { }); // Object.from(...)
 
 	// reset any previous information about the configuration
 	options.config.children.name.values.reset();
@@ -56,14 +56,15 @@ async function write() { let port; try {
 	try { // test that the configuration works
 		Native.setApplicationName(name);
 		(await Native.do(async process => {
-			(await process.require('node_modules/native-ext/test.node.js'));
+			(await process.require('/node_modules/native-ext/test.node.js'));
 		}));
 	} catch (error) {
 		Native.setApplicationName(null);
+		console.error(error);
 		throw new Error(`The configuration could not be verified, please make sure that the profile path is set correctly \n(${error.message})`);
 	}
 
-	// save information about configuration
+	// save information about the configuration
 	options.config.children.name.value = name;
 	options.config.children.version.value = version;
 

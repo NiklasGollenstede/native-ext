@@ -1,5 +1,7 @@
 /* eslint-env node */ /* eslint-disable strict */ 'use strict'; module.exports =  async (channel, config) => {
 
+{ process.argv[0] = process.argv0; /* bugfix for native-ext v0.3.1 */ } // TODO: fix in app and remove
+
 if (config.inspect) {
 	const { port, host, break: doBreak, } = config.inspect;
 	require('inspector').open(port, host, doBreak);

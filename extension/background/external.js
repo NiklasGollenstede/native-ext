@@ -15,11 +15,11 @@ async function onMessageExternal(message, sender) { switch (message.request) {
 			const state = (await (await require.async('./prompt')).requestPermission({ id: sender, message: message.message, }));
 			if (state !== 'allowed') { return { failed: true, code: state, message: 'Permission to use NativeExt was not granted', }; }
 			vExtensions.splice(Infinity, 0, sender);
-			wants[sender] && wants[sender].forEach(_=>_());
 		}
 		// Always write, to make sure the extension state is matched by the on-disc configuration.
 		try { (await (await require.async('./config')).write()); }
 		catch (error) { return { failed: true, code: 'config-failed', message: error.message, }; }
+		wants[sender] && wants[sender].forEach(_=>_());
 		return { failed: false, name: vName.get(), };
 	}
 	case 'removePermission': {

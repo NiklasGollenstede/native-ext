@@ -75,7 +75,7 @@ async function writeProfile({ browser, dir, ids, locations, }) {
 	unpacked && defaultIds.forEach(id => (locations[id] = Path.resolve(__dirname, '../../extension/build/')));
 
 	const manifest = {
-		name, description: `WebExtensions native connector (${browser}:${dir})`,
+		name, description: `WebExtensions native connector (${browser}: ${dir})`,
 		path: target + packageJson.name + scriptExt,
 		type: 'stdio', // mandatory
 		allowed_extensions: browser === 'firefox' ? ids : undefined,

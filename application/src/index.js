@@ -5,7 +5,7 @@ Error.stackTraceLimit = Infinity; // get them all ...
 const args = process.argv.slice(2);
 
 switch (args[0]) {
-	case 'eval': { console.log(eval(args.slice(1).join(' '))); } break;
+	case 'eval': { console.log(eval(args.slice(1).join(' '))); } break; // eslint-disable-line no-console
 	case undefined: // started from file system / without args ==> install
 	case 'install': /*case 'refresh': case 'uninstall':*/ {
 		const command = args[0] || 'install';
@@ -22,13 +22,12 @@ switch (args[0]) {
 }
 
 })().catch(error => {
-	console.error('Operation failed:', error);
+	process.exitCode = 1; console.error('Operation failed:', error);
 	dialog('error', 'Error: Native-Ext', `Operation failed, see the command window for more information`);
-	process.exitCode = 1;
 });
 
 function dialog(type, title, message) {
-	if (process.argv.includes('--no-dialog')) { console[type](title, message); return; }
+	if (process.argv.includes('--no-dialog')) { console[type](title, message); return; } // eslint-disable-line no-console
 	switch (process.platform) {
 		case 'win32': {
 			type = ({ info: 64, warn: 48, error: 16, })[type] || 0;

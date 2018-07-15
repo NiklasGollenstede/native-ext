@@ -29,10 +29,10 @@ environment:
   AMO_JWT_ISSUER: "user:11844708:244" # generate at https://addons.mozilla.org/developers/addon/api/key/
   AMO_JWT_SECRET: # encrypt the secret with https://ci.appveyor.com/tools/encrypt
     secure: qK0cmL39oH20zxiczXoa9W/xovxGLKXDx/bgBGBfTSJ3mqw/smXs3nE1eHGaOpwgVb3yn1/d76USsqFD0+2K70ZIp1OpHNrs4pjw9oaIc2g=
-  nodejs_version: "8.3.0"
+  nodejs_version: 8.9.0
   matrix:
-    - nodejs_arch: "x64"
-    - nodejs_arch: "x86"
+    - nodejs_arch: x64
+    - nodejs_arch: x86
 
 init: # run before 'git clone'
   - cmd: git config --global core.autocrlf true # use \r\n line endings on windows
@@ -68,7 +68,7 @@ install:
   # pack
   - npm run build && cd release
   - cmd: ren native-ext.exe native-ext-v%manifest_version%-win-%nodejs_arch%.exe
-  - sh:  mv  native-ext     native-ext-v$manifest_version-linux-$nodejs_arch
+  - sh:  mv  native-ext     native-ext-v$manifest_version-linux-$nodejs_arch.bin # must use extension because GitHub doesn't allow to change file extensions, which makes changing the version in the name difficult
   - cd ..
   # application build done
   - cd ..

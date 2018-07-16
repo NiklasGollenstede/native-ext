@@ -2,7 +2,7 @@
 
 /**
  * This module collects and exposes information about the connecting browser and extension.
- * It is available as 'browser' for the extension modules.
+ * It is available as `require('browser')` for the extension modules.
  */
 
 const FS = require('fs'), Path = require('path');

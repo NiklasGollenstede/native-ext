@@ -20,7 +20,7 @@ port.addHandlers({
 		if (!(/(?:\bn(?:ative|ode)|(?:^|[\\/])n(?:ative|ode)[\\/].*)\.js$/).test(path)) {
 			throw new Error(`path must contain /node/ or /native/ or end with \\bnode.js or \\bnative.js`);
 		}
-		const exports = (await process.mainModule.require(Path.join('/webext/', path)));
+		const exports = (await process.mainModule.require(Path.join(process.mainModule.filename, path)));
 		(await typeof exports !== 'object' ? callback(exports) : callback(...[].concat(...Object.entries(exports))));
 	},
 });

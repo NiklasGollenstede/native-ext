@@ -56,11 +56,11 @@ async function write() { let port; try {
 	try { // test that the configuration works
 		Native.setApplicationName(name);
 		(await Native.do(async process => {
-			(await process.require('/node_modules/native-ext/test.node.js'));
+			try { (await process.require('/node_modules/native-ext/test.node.js')); }
+			catch (error) { error && console.error(error.message +'\n'+ error.stack); throw error; }
 		}));
 	} catch (error) {
 		Native.setApplicationName(null);
-		console.error(error);
 		throw new Error(`The configuration could not be verified, please make sure that the profile path is set correctly \n(${error.message})`);
 	}
 

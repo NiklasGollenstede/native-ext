@@ -1,6 +1,6 @@
 {
 	"name": "native-ext",
-	"version": "0.3.1",
+	"version": "0.3.2",
 	"description": "WebExtensions native connector library, application and extension",
 	"author": "Niklas Gollenstede",
 	"license": "MIT",

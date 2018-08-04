@@ -4,6 +4,7 @@
 
 /**
  * Global `Manager` instance that keeps track of the profile specific native application `name`.
+ * @see the documentation in `./manager.js`.
  */
 const exports = Object.assign(new Manager({
 	/// automatically uses the saved application `name`, blocks indefinitely until `name` becomes known,
@@ -38,7 +39,21 @@ const exports = Object.assign(new Manager({
 	 */
 	removePermission,
 
+	/**
+	 * Async getter for the browser profile specific native messaging application name.
+	 * Uses either an internally persistently stored value or contacts the NativeExt extension to request it.
+	 * Since that name is required to connect (launch processes), this library will only be operational while this function returns a value.
+	 * @param  {boolean?}  .stale     If this is set to `true`, only the stored value will be used, if set to `false`, the stored value will be ignored.
+	 *                                If unset, the stored value will be used if present or requested if not.
+	 * @param  {boolean?}  .blocking  If `true`, block until the mane is known instead of returning `null`.
+	 * @return {string?}              Application name or `null` if not set up/permitted, `undefined` if unknown.
+	 */
 	getApplicationName,
+
+	/**
+	 * Sets the internal native messaging application name. Setting an incorrect value will break the communication.
+	 * @param {string|null}  name  Value to set.
+	 */
 	setApplicationName,
 
 	extensionInstallPage: browser => ({
@@ -67,7 +82,7 @@ async function removePermission() {
 
 let appName /* = undefined */; // cache and fallback for iDB
 let awaitName, gotName;
-async function getApplicationName(options) {
+async function getApplicationName(options) { // TODO: this is overly complicated and probably incorrect in some edge-cases
 	if (!options || options.stale !== false) { try {
 		if (appName !== undefined) { return appName; }
 		const name = (await (await getStore()).get('name'));

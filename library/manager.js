@@ -9,13 +9,13 @@
  * Manages a `Process`. Spawns the process when necessary,
  * respawns it when it crashes and terminates it when no longer needed.
  * Stdio of the process is logged to the console, uncaught errors/rejections respawn the process.
- * @see  `Process`
+ * @see the documentation in `./process.js`.
  */
 class Manager {
 
 	/**
 	 * @param  {string?}    .name       Name of the native application for `runtime.connectNative()`.
-	 * @param  {function?}  .name       Lazy async fallback getter for `.name`.
+	 * @param  {function?}  .getName    Lazy async fallback getter for `.name`.
 	 * @param  {natural?}   .keepAlive  Time in ms to keep the process alive after the last listener was removed.
 	 * @param  {any?}       .inspect    Initial value for `this.inspect`.
 	 */
@@ -30,6 +30,10 @@ class Manager {
 	 */
 	async do(action) { return Self.get(this).do(action); }
 
+	/**
+	 * @property  {any}  inspect  The current value of this is passed as `.inspect` argument to the `Process` constructor.
+	 */
+
 	/// Removes all listeners and immediately terminates the process.
 	destroy() { const self = Self.get(this); self && self.destroy(); }
 } const Self = new WeakMap;
@@ -41,11 +45,12 @@ class Manager {
  * called with the new or existing process immediately (or as soon as it is started).
  * So effectively, calling `manager.on(callback)` ensures that the process is and stays running
  * and calls `callback` immediately and after every respawn.
+ * To let the process terminate permanently, call `manager.on.removeListener(callback)`.
  */
 setEventGetter(Manager, '', Self);
 
 /**
- * Event `onError`: Event fired with [ type, error, ] fired when a critical error occurs.
+ * Event `onError`: Event fired with [ type, error, ] when a critical error occurs.
  * - `reason` === 'uncaught': There was a uncaught error/rejection, the process was killed and will be respawned.
  * - `reason` === 'spawn': The process failed to (re-)start. The process won't be respawned automatically again.
  */

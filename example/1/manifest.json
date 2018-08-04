@@ -1,0 +1,25 @@
+{
+	"manifest_version": 2,
+	"name": "NativeExt - Example 1",
+	"version": "0.0.1",
+	"author": "Niklas Gollenstede",
+	"description": "NativeExt example extension #1",
+	"icons": { "1": "/icon.svg" },
+	"applications": {
+		"gecko": {
+			"id": "@native-ext-example-1"
+		}
+	},
+	"permissions": [
+		"nativeMessaging"
+	],
+	"incognito": "spanning",
+	"background": { "scripts": [
+		"node_modules/pbq/require.js",
+		"background.js"
+	] },
+	"options_ui": {
+		"page": "options.html",
+		"open_in_tab": false
+	}
+}

@@ -1,8 +1,15 @@
 <b>NativeExt -- Management extension</b>
 
+<!-- summary on AMO: -->
+
 The NativeExt extension manages access to the NativeExt application, which gives other browser extensions full access to your computer.
 NativeExt will explicitly ask you for every extension before granting it access to your system.
-To use NativeExt, you must <a download href="https://latest.native-ext.niklasg.de/download/${os}-${arch}/">download</a> and <b>install</b> the application, and then click the <b><code>Apply</code></b> button in the options.
+
+---
+
+<!-- description on AMO: -->
+
+To use NativeExt, you must download and install <a download href="https://github.com/NiklasGollenstede/native-ext#readme">its desktop application</a> as well. The extensions option page on <code>about:addons</code> will guide you through the process.
 
 
 <b>Description</b>

@@ -14,7 +14,8 @@ class Process {
 	/**
 	 * Asynchronously creates (spawns) the process via Native Messaging.
 	 * @param  {string}     .name     Registered name of the Native Messaging app to spawn.
-	 * @param  {object?}    .inspect  Optional boolean whether or object `{ port, host, break, }` how to open the inspector.
+	 * @param  {object?}    .inspect  Optional boolean whether to, or object `{ port, host, break, }` how to,
+	 *                                open the inspector after process initialization and before the first `require` call.
 	 * @param  {function?}  .on*      Optional initial listener for each instance event.
 	 */
 	constructor(options) { return new _Process(this, options); }
@@ -43,10 +44,10 @@ class Process {
 /**
  * Event fired with `(encoding, data)` when the process writes to `stdout`.
  * If `encoding` is the empty string, `data` is (and was written as) an `utf-8` string.
- * Otherwise, `data` is a `base64` representation of the logged data and `encoding` its encoding.
+ * Otherwise, `data` is a `base64` representation of the logged buffer and `encoding` its encoding.
  */
 setEventGetter(Process, 'stdout', Self);
-/// As `onStdout`, but for `stderr`.
+/// Like `onStdout`, but for `stderr`.
 setEventGetter(Process, 'stderr', Self);
 
 /**

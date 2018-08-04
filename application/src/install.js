@@ -21,7 +21,7 @@ const source = Path.normalize(unpacked ? __dirname : process.argv[0]); // locati
 
 const nodeOptions = process.argv.find(_=>_.startsWith('--node-options='));
 const windows = process.platform === 'win32', linux = process.platform === 'linux', macos = process.platform === 'darwin';
-const scriptExt = windows ? '.bat' : '.sh', forwardArgs = windows ? '%*' : '$@';
+const scriptExt = windows ? '.bat' : '.sh', forwardArgs = windows ? '%*' : '"$@"';
 const installDir = (windows ? process.env.APPDATA +'\\' : require('os').homedir() + (macos ? '/Library/Application Support/' : '/.')) + fullName;
 
 const outPath = (...path) => Path.resolve(installDir, ...path);

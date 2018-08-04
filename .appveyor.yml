@@ -22,8 +22,8 @@ skip_tags: true # (commits create tags, so) don't build on tags
 
 
 image: # build for windows and linux
+  - Ubuntu # builds the extension as well, so do this first
   - Visual Studio 2015
-  - Ubuntu
 
 environment:
   AMO_JWT_ISSUER: "user:11844708:244" # generate at https://addons.mozilla.org/developers/addon/api/key/

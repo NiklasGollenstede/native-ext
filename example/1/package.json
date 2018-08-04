@@ -1,0 +1,13 @@
+{
+	"name": "native-ext-example-1",
+	"version": "0.0.1",
+	"author": "Niklas Gollenstede",
+	"license": "MIT",
+	"scripts": {},
+	"dependencies": {
+		"multiport": "^0.2.3",
+		"native-ext": "^0.3.2-beta.1",
+		"pbq": "^0.3.4",
+		"web-ext-utils": "^0.1.4"
+	}
+}

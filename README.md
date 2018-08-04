@@ -23,7 +23,7 @@ The extension is automatically updated by the browser and should take care of ev
 
 The extension can be removed like any other extension.
 There is no automated uninstallation for the application yet. The application is installed in the home folder, specifically in `%APPDATA%\de.niklasg.native_ext` on Windows, `~/.de.niklasg.native_ext` on Linux and `~/Library/Application Support/de.niklasg.native_ext` on macOS.
-Besides the files in that folder, each configuration in `profiles/` is linked elsewhere so that the browser can find it. There is a `unlink` script in every configuration folder.
+Besides the files in that folder, each configuration in its `profiles/` subdirectory is linked elsewhere so that the browser can find it. There is a `unlink` script in every configuration folder.
 To remove NativeExt without traces, call all those `unlink` scripts and delete the installation/configuration folder.
 
 
@@ -73,12 +73,45 @@ Mostly done. Outstanding work:
  * Write an uninstaller
 
 
-### [API](./docs/README.md)
+### API
+
+There are two locations where NativeExt exposes APIs to the extensions.
+
+#### As library in the Browser
+
+The [library/](./library/) modules can be required in the background script of a WebExtension and exposes functions to use automatically or explicitly managed native processes.
+For now, please refer to the function and class documentation in the source files.
+
+#### In the node.js process
+
+NativeExt executes the node.js modules provided by the extensions in a slightly modified node.js environment and additionally exposes some modules.
+
+The **environment** in the node.js process is still subject to change. It should be brought closer to "vanilla" node.js.
+This currently works:
+
+ * `require()`ing included files by relative path
+ * reading included files with the `fs` module
+ * passing `fs.realpath(...)` of included files to other application
+
+But extensions should not write th the extension folder or rely on its location within the file system.
+
+The **modules** exposed by `native-ext` are `ffi`, `ref`, `ref-array`, `ref-union` and `ref-struct` to interact with native functions and a custom `browser` module.
+These modules can be required like build-in modules (e.g. `require('ref')`).
+
+The **`browser`** module exports the following constants:
+
+ * `name`: One of `'chromium'`, `'chrome'` or `'firefox'`.
+ * `profileDir`: The current browser profile location, e.g. `C:\Users\<user>\AppData\Roaming\Mozilla\Firefox\Profiles\<rand>.<name>` or `C:\Users\<user>\AppData\Local\Google\Chrome\User Data\Default`
+ * `extId` The ID of the current extension (string).
+ * `extDir` or `extFile`: The directory or file the extension is loaded from. Only the applicable one is set.
+ * `pid`: Process ID of the current browsers main process (integer). (This is retrieved lazily and may be expensive to obtain.)
 
 
 ### Example
 
-An example using the library:
+An complete example using the library can be found in [`example/1`](./example/1). Here are the basic components:
+
+`npm i native-ext multiport web-ext-utils pbq` (and make the required files available in the packed extension)
 
 ```js
 const Native = await require.async('node_modules/native-ext/');
@@ -86,14 +119,14 @@ const Native = await require.async('node_modules/native-ext/');
 await Native.requestPermission({ message: 'Wanna do great stuff', });
 // assume the NativeExt extension is set up and the user grants permission right away
 
-const file = await Native.do(process => { // keep process alive until this function exits
+const file = await Native.do(async process => { // keep process alive until this function exits
 
-	const fs = await Native.require(require.resolve('./fs.node.js'));
-	const file = await fs.readFile(somePath, 'utf8');
+	const fs = await process.require(require.resolve('/fs.node.js'));
+	const file = await fs.readFile(somePath, 'utf-8');
 
 	fs.watch(someOtherPath, { }, onChange); // can even send callbacks
 	await waitSomeTime();
-	fs.unwatch(onChange); // remove listener after the connection closed
+	fs.unwatch(onChange); // remove listener
 
 	return file;
 });
@@ -102,27 +135,25 @@ function onChange(type, name) {
 	console.log('File', name, type +'d');
 }
 ```
-`./fs.node.js`:
+`/fs.node.js`:
 ```js
-'use strict'; /* global require, module, exports, process, Buffer, */
+'use strict'; /* globals require, module, exports, process, Buffer, */
 
 const { promisify, } = require('util'), promisifyAll = ...; // work with promises
 
 const fs = promisifyAll(require('fs')); // any native module, 'ffi', 'browser' or any file included in the extension
 
-port.addHandlers('fs.', fs); // expose the fs module under the 'fs.' prefix
-
 // handle special case of `fs.watch`
-const cb2watcher = new WeakSet, { watch, } = fs;
+const cb2watcher = new WeakSet, { watch, } = require('fs');
 fs.watch = (path, options, callback) => {
 	const watcher = watch(path, options, callback);
-	ch2watcher.set(callback, watcher);
+	cb2watcher.set(callback, watcher);
 };
 fs.unwatch = callback => {
-	const watcher = ch2watcher.get(callback);
+	const watcher = cb2watcher.get(callback);
 	watcher && watcher.close();
-	ch2watcher.delete(callback);
-}
+	cb2watcher.delete(callback);
+};
 
 module.exports = fs;
 ```
@@ -134,12 +165,8 @@ module.exports = fs;
 As NativeExt loads code from inside the extension package, it needs to locate the local extension installation.
 Currently, the only supported location is in the `extensions/` (or `Extensions/`) folder in the profile, which is correct for normal extension installations.
 
-Extensions that are temporary loaded during development have to be linked or copied to the extension folder to be accessible.
-There are several supported ways to do this:
-- zip the extension and place it as `{ext-id}.xpi` inside the extensions folder (Firefox only)
-- copy the unpacked extension to the extension folder
-- link the (packed or unpacked) extension to the extension folder (not recommended, the browsers tend to (recursively) delete everything in that folder on restart)
-- put a text file called `{ext-id}` inside the extension folder, whose only content is the absolute path to your unpacked extension
+The location of other extensions, especially unpacked ones during development, must be explicitly set under "External extensions" on the options page of the NativeExt extension for each profile.
+An alternative workaround is to place a copy of the extension (in the browser specific format) in the correct location.
 
 
 ### Building
@@ -148,7 +175,8 @@ This project contains three sub-projects: the application itself, the extension 
 
 #### Building (application)
 
-Building the NativeExt application requires node.js in the exact version listed in the `package.json`/`"scripts"`.`"build"` command (currently 8.3), npm and [node-gyp](https://github.com/nodejs/node-gyp#installation) including its dependencies. After cloning or downloading the sources, step in the `application` directory and install the dependencies with:
+Building the NativeExt application requires node.js in the exact version listed in the `package.json`/`"scripts"`.`"build"` command (currently 8.3), npm and [node-gyp](https://github.com/nodejs/node-gyp#installation) including its dependencies.
+After cloning or downloading the sources, step in the `application` directory and install the dependencies with:
 
 `npm install`
 
@@ -174,7 +202,7 @@ The library does not need to be build, but is needs to be linked for the extensi
 
 #### Building (extension)
 
-Step in the `extension` directory and install and build with `npm install`. Use `npm start` to re-build.
+Step in the `extension` directory, then install, link and build with `npm install`. Use `npm start` to re-build.
 
 
 ### Debugging

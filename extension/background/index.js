@@ -53,6 +53,7 @@ async function autoUpdate(explicit) { try {
 		icon: 'default', timeout: null,
 	}); } else { console.info('Installing update', `Downloading and installing ${expected} from ${url}`); }
 	(await Update.install(expected));
+	// TODO: explicitly spawn a new process and check the version
 	notify.success(`NativeExt ${expected} installed`, `Update was installed successfully, some extensions may need to be reloaded.`);
 } catch(error) { notify.error(`Automatic update failed`, error); } }
 

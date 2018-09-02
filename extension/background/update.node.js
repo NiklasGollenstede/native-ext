@@ -8,10 +8,14 @@ async function install(name, data) {
 	name = name.replace(/(?:\.exe|\.bin)?$/, exe => '-'+ Math.random().toString(32).slice(2) + exe);
 	const path =  Path.resolve(OS.tmpdir(), name);
 	(await writeFile(path, data, 'base64')); // can handle url-base64 as well
-	(await chmod(path, '754'));
-	try { console.log('installed', (await exec(path, [ 'install', '--no-dialog', ], { }))); }
-	catch (error) { console.error(error.stderr); throw error; }
-	finally { try { (await unlink(path)); } catch (_) { } }
+	try {
+		(await chmod(path, '754'));
+		console.log('installed', (await exec(path, [ 'install', '--no-dialog', ], { })));
+	} catch (error) {
+		console.error(error.stderr); throw error;
+	} finally {
+		try { (await unlink(path)); } catch (_) { }
+	}
 }
 
 module.exports = { // dummy

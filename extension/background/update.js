@@ -10,7 +10,6 @@ const expected = new Version((/^\d+\.\d+\.\d+/).exec(manifest.version)[0]);
 
 async function getVersions() {
 	return { installed: (await getInstalled()), expected, };
-	// return { installed: new Version('0.1.0'), expected: new Version('0.2.3'), }; // for testing
 }
 
 async function getInstalled() {
@@ -38,7 +37,7 @@ async function install(version) {
 	}))).replace(/^.*,/, ''); // remove data-URL prefix
 
 	return Native.do(async process => {
-		(await (await process.require(require.resolve('./update.node.js')))).install(name, data);
+		(await (await process.require(require.resolve('./update.node.js'))).install(name, data));
 	}, { blocking: false, });
 }
 

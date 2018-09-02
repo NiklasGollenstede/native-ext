@@ -54,7 +54,7 @@ async function autoUpdate(explicit) { try {
 	}); } else { console.info('Installing update', `Downloading and installing ${expected} from ${url}`); }
 	(await Update.install(expected));
 	notify.success(`NativeExt ${expected} installed`, `Update was installed successfully, some extensions may need to be reloaded.`);
-} catch(error) {notify.error(`Automatic update failed`, error); } }
+} catch(error) { notify.error(`Automatic update failed`, error); } }
 
 
 // debug stuff

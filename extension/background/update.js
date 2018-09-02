@@ -21,8 +21,8 @@ async function getInstalled() {
 
 async function check(version) {
 	const url = exeUrl(version); try {
-		const abort = new AbortController();
-		const { status, } = (await fetch(url, { signal: abort.signal, }));
+		const abort = new global.AbortController();
+		const { status, } = (await global.fetch(url, { signal: abort.signal, }));
 		abort.abort(); // GitHub doesn't support HEAD requests ...
 		return status >= 200 && status < 400 ? url : null;
 	} catch (error) { return null; }
@@ -33,8 +33,8 @@ async function install(version) {
 	console.info('NativeExt installing update from', url);
 
 	// use browser to fetch binary as to not bypass proxy settings etc
-	const data = (await fetch(url).then(_=>_.blob()).then(blob => new Promise((onload, onerror) => {
-		Object.assign(new FileReader, { onerror, onload() { onload(this.result); }, }).readAsDataURL(blob);
+	const data = (await global.fetch(url).then(_=>_.blob()).then(blob => new Promise((onload, onerror) => {
+		Object.assign(new global.FileReader, { onerror, onload() { onload(this.result); }, }).readAsDataURL(blob);
 	}))).replace(/^.*,/, ''); // remove data-URL prefix
 
 	return Native.do(async process => {

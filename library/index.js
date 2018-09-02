@@ -89,14 +89,14 @@ async function getApplicationName(options) { // TODO: this is overly complicated
 		if (name) { return (appName = name); }
 	} catch (error) { console.error(error); } }
 	let name; if (options && options.blocking) {
-		name = (await (awaitName = awaitName || new Promise(async got => {
+		name = (await (awaitName = awaitName || new Promise(got => {
 			gotName = got; let sleep = 500;
-			let name; while (!name) {
+			let name; (async () => { while (!name) {
 				try { ({ name, } = (await sendMessage({ request: 'awaitName', }))); }
 				catch (error) { console.error(error); sleep *= 2; }
 				if (name && gotName) { gotName(name); gotName = null; }
 				if (!name) { (await new Promise(wake => setTimeout(wake, sleep))); }
-			}
+			} })();
 		})));
 	} else if (options && options.stale) {
 		return appName; // undefined

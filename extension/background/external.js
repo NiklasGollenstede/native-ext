@@ -19,7 +19,7 @@ async function onMessageExternal(message, sender) { switch (message.request) {
 		// Always write, to make sure the extension state is matched by the on-disc configuration.
 		try { (await (await require.async('./config')).write()); }
 		catch (error) { return { failed: true, code: 'config-failed', message: error.message, }; }
-		wants[sender] && wants[sender].forEach(_=>_());
+		wants[sender] && wants[sender].forEach(_=>_()); delete wants[sender];
 		return { failed: false, name: vName.get(), };
 	}
 	case 'removePermission': {

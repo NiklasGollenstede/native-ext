@@ -63,14 +63,30 @@ Extensions have to ask the user for permission and can then load any node.js mod
 Everything except the most basic code to initialize the node.js process is included in the extensions themselves, so software components are always updated in the browser and node.js parts of extensions at the same time: when the extension receives its update through the normal browser update mechanism.
 
 
+### Architecture
+
+To use Native Messaging in an extension, the target application has to be installed on the computer already and needs to whitelist the extensions ID (browser/protocol requirements).
+The majority of the code executed in the node.js environment is supposed to be supplied by the extension installed in the browser.
+To avoid `eval`ing code strings explicitly send by the extension vis the messaging protocol, NativeExt locates the installed extension and loads the code directly from disk, which requires knowledge of the current browser profile location.
+Since browsers don't tell the native application this location, it has to be managed by NativeExt itself. Automatic detection is often, but not always reliably, possible and also takes some time.
+
+The NativeExt project is therefore split up in three parts:
+
+ * the application itself, which is basically just the node.js runtime, some messaging code and the functionality to write configurations
+ * a browser management extension which guides through the installation of the application, has the UI for the configuration by the user and initiates updates of the application
+ * library components that can be included in other extensions to gain access through the management extension and to manage application processes afterwards
+
+
 ### Implementation status
 
 Mostly done. Outstanding work:
 
- * Update node.js from version 8.3 to ... (10.x ?)
- * Update dependencies and hand-pick them for the `package-lock.json`
- * Support for Edge, Opera, Vivaldi, ...
- * Write an uninstaller
+ * a proper installer
+	 * should also take care of uninstallation
+	 * can include bare node.js (easier runtime updates)
+ * automatic builds for MacOS (the CI, AppVeyor, plans to support MacOS [by the end of 2018](https://help.appveyor.com/discussions/questions/23413-are-there-plans-to-make-mac-os-images-available))
+ * updated dependencies and hand-pick them for the `package-lock.json`
+ * support for other browsers (but Edge uses a completely different protocol)
 
 
 ### API
@@ -79,7 +95,8 @@ There are two locations where NativeExt exposes APIs to the extensions.
 
 #### As library in the Browser
 
-The [library/](./library/) modules can be required in the background script of a WebExtension and exposes functions to use automatically or explicitly managed native processes.
+The [library/](./library/) modules can be installed via `npm i native-ext` and be required in the background script of a WebExtension.
+It provides functions and classes to use automatically or explicitly managed native processes.
 For now, please refer to the function and class documentation in the source files.
 
 #### In the node.js process
@@ -160,7 +177,6 @@ module.exports = fs;
 
 
 ### Extension location
-<!-- TODO: outdated -->
 
 As NativeExt loads code from inside the extension package, it needs to locate the local extension installation.
 Currently, the only supported location is in the `extensions/` (or `Extensions/`) folder in the profile, which is correct for normal extension installations.

@@ -9,9 +9,9 @@
 		"url": "git@github.com:NiklasGollenstede/native-ext.git"
 	},
 	"devDependencies": {
-		"babel-eslint": "8.2.3",
-		"eslint": "4.19.1",
-		"eslintrc": "NiklasGollenstede/eslintrc#88b3327"
+		"babel-eslint": "9.0.0",
+		"eslint": "5.5.0",
+		"eslintrc": "NiklasGollenstede/eslintrc#8e5b58d"
 	},
 	"scripts": {
 		"lint": "cd application && npm run lint && cd ../extension && npm run lint && cd ../library && npm run lint"

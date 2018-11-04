@@ -126,7 +126,7 @@ The **`browser`** module exports the following constants:
 
 ### Example
 
-An complete example using the library can be found in [`example/1`](./example/1). Here are the basic components:
+A complete example using the library can be found in [`example/1`](./example/1). Here are the basic components:
 
 `npm i native-ext multiport web-ext-utils pbq` (and make the required files available in the packed extension)
 
